@@ -42,8 +42,9 @@
 	import { resolveLocalizedModelName } from '$lib/utils/localizedContent';
 	import equal from 'fast-deep-equal';
 
-	import Name from './Name.svelte';
-	import ProfileImage from './ProfileImage.svelte';
+import Name from './Name.svelte';
+import ProfileImage from './ProfileImage.svelte';
+import BanyanEvents from '$lib/components/banyan/BanyanEvents.svelte';
 	import Image from '$lib/components/common/Image.svelte';
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
 	import RateComment from './RateComment.svelte';
@@ -704,6 +705,14 @@
 			<div>
 				<div class="chat-{message.role} w-full min-w-full">
 					<div>
+						<!-- banyan 渲染协议（钩点②，统一设计 §6.1-§6.2）：
+						     编排事件存在时按序渲染五组件于正文上方 -->
+						{#if message?.banyanEvents?.length}
+							<div class="mb-2">
+								<BanyanEvents events={message.banyanEvents} {chatId} />
+							</div>
+						{/if}
+
 						{#if model?.info?.meta?.capabilities?.status_updates ?? true}
 							<StatusHistory statusHistory={message?.statusHistory} />
 						{/if}

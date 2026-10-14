@@ -130,6 +130,7 @@
 	import WebSearchConfirmDialog from '../common/ConfirmDialog.svelte';
 	import Placeholder from './Placeholder.svelte';
 	import FilesOverlay from './MessageInput/FilesOverlay.svelte';
+	import { unwrapBanyanEvent } from '$lib/components/banyan/types';
 	import NotificationToast from '../NotificationToast.svelte';
 	import Spinner from '../common/Spinner.svelte';
 	import Modal from '../common/Modal.svelte';
@@ -1517,7 +1518,15 @@
 				const data = event?.data?.data ?? null;
 
 				queueMicrotask(() => bridge?.update());
-				if (type === 'status') {
+				if (type === 'banyan') {
+					// banyan 渲染协议（钩点①，统一设计 §6.1）：
+					// 编排事件按流式顺序追加进 message.banyanEvents[]，随 history 持久化；
+					// 渲染由 ResponseMessage 挂载的 $lib/components/banyan/BanyanEvents.svelte 完成。
+					const banyanEvent = unwrapBanyanEvent(data);
+					if (banyanEvent) {
+						message.banyanEvents = [...(message.banyanEvents ?? []), banyanEvent];
+					}
+				} else if (type === 'status') {
 					if (message?.statusHistory) {
 						message.statusHistory.push(data);
 					} else {
@@ -2872,6 +2881,24 @@
 				// Sanitize history: repair orphaned references and structurally-malformed
 				// nodes from failed regenerations (#24424, #24157, #20474)
 				sanitizeHistory(history);
+
+				// banyan 渲染协议（钩点①）：历史载入时从持久字段恢复编排事件。
+				// 事件随 history JSON 持久化在 chat.db；兼容旧形状 message.banyan.events。
+				if (history?.messages) {
+					for (const message of Object.values(history.messages)) {
+						const banyanMessage = message as Record<string, any>;
+						const events = Array.isArray(banyanMessage?.banyanEvents)
+							? banyanMessage.banyanEvents
+							: Array.isArray(banyanMessage?.banyan?.events)
+								? banyanMessage.banyan.events
+								: null;
+						if (events) {
+							banyanMessage.banyanEvents = events
+								.map((event) => unwrapBanyanEvent(event))
+								.filter((event) => event !== null);
+						}
+					}
+				}
 
 				chatTitle.set(chatContent.title);
 
