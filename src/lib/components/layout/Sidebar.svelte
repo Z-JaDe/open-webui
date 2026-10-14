@@ -130,13 +130,14 @@
 	let showChatsMenu = false;
 	let showBanyanTasks = true;
 
-	// banyan 任务分区五入口（钩点③）
+	// banyan 任务分区入口（钩点③；WE-7 起含 /arch 架构页）
 	const banyanTaskEntries = [
 		{ id: 'registry', label: 'Registry', href: '/registry', prefix: '/registry' },
 		{ id: 'cards', label: 'Cards', href: '/cards', prefix: '/cards' },
 		{ id: 'audit', label: 'Audit', href: '/audit', prefix: '/audit' },
 		{ id: 'waves', label: 'Waves', href: '/waves', prefix: '/waves' },
-		{ id: 'tree', label: 'Tree', href: '/tree', prefix: '/tree' }
+		{ id: 'tree', label: 'Tree', href: '/tree', prefix: '/tree' },
+		{ id: 'arch', label: 'Arch', href: '/arch', prefix: '/arch' }
 	];
 
 	$: activeBanyanEntryPrefix = banyanTaskEntries.find(
@@ -1383,7 +1384,7 @@
 					{/if}
 
 					<!-- banyan 任务分区（钩点③，统一设计 §6.1 / §8 G5）：
-					     五入口：登记簿 / 审卡 / 事件 / 波次 / 树；数据源 /banyan/api/* -->
+					     入口：登记簿 / 审卡 / 事件 / 波次 / 树 / 架构(/arch)；数据源 /banyan/api/* -->
 					<SidebarSection
 						id="sidebar-banyan"
 						bind:open={showBanyanTasks}
