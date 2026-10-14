@@ -105,7 +105,7 @@ async def banyan_proxy(
     user: Any = Depends(get_verified_user),
 ):
     """把 /banyan/api/* 请求 1:1 转发到引擎，流式回传（兼容 SSE）。"""
-    target_url = f"{BANYAN_ENGINE_URL}/{path}"
+    target_url = f"{BANYAN_ENGINE_URL}/api/{path}"  # 引擎端点带 /api 前缀(E2E 修正)
 
     headers = {
         key: value
