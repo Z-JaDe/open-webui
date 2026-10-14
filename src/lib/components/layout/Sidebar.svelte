@@ -128,6 +128,20 @@
 	let showFolders = false;
 	let showSharedFolders = false;
 	let showChatsMenu = false;
+	let showBanyanTasks = true;
+
+	// banyan 任务分区五入口（钩点③）
+	const banyanTaskEntries = [
+		{ id: 'registry', label: 'Registry', href: '/registry', prefix: '/registry' },
+		{ id: 'cards', label: 'Cards', href: '/cards', prefix: '/cards' },
+		{ id: 'audit', label: 'Audit', href: '/audit', prefix: '/audit' },
+		{ id: 'waves', label: 'Waves', href: '/waves', prefix: '/waves' },
+		{ id: 'tree', label: 'Tree', href: '/tree', prefix: '/tree' }
+	];
+
+	$: activeBanyanEntryPrefix = banyanTaskEntries.find(
+		(entry) => $page.url.pathname === entry.prefix || $page.url.pathname.startsWith(`${entry.prefix}/`)
+	)?.prefix ?? null;
 
 	let folders = {};
 	type SelectedSidebarFolder = { id: string } | null;
@@ -1367,6 +1381,36 @@
 							{/each}
 						</SidebarSection>
 					{/if}
+
+					<!-- banyan 任务分区（钩点③，统一设计 §6.1 / §8 G5）：
+					     五入口：登记簿 / 审卡 / 事件 / 波次 / 树；数据源 /banyan/api/* -->
+					<SidebarSection
+						id="sidebar-banyan"
+						bind:open={showBanyanTasks}
+						name={$i18n.t('Tasks')}
+						dragAndDrop={false}
+					>
+						{#each banyanTaskEntries as entry (entry.href)}
+							<a
+								href={entry.href}
+								class="flex items-center gap-2 rounded-lg px-2 py-1.5 transition {activeBanyanEntryPrefix ===
+								entry.prefix
+									? 'bg-black/[0.035] dark:bg-white/[0.045]'
+									: 'hover:bg-gray-100 dark:hover:bg-gray-900'}"
+								draggable="false"
+								aria-label={$i18n.t(entry.label)}
+							>
+								<div class="self-center flex size-4 shrink-0 items-center justify-center text-gray-700 dark:text-gray-300">
+									<div class="text-[10px] font-semibold leading-none">B</div>
+								</div>
+								<div class="flex self-center translate-y-[0.5px] min-w-0">
+									<div class="self-center text-[0.8125rem] leading-5 truncate">
+										{$i18n.t(entry.label)}
+									</div>
+								</div>
+							</a>
+						{/each}
+					</SidebarSection>
 
 					{#if $config?.features?.enable_folders && ($user?.role === 'admin' || ($user?.permissions?.features?.folders ?? true))}
 						<SidebarSection
