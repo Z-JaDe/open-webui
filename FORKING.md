@@ -38,6 +38,8 @@
 | `src/routes/(app)/(banyan)/` | 五路由 + 共享布局 + waves/tree 入口页 |
 | `backend/open_webui/routers/banyan.py` | 代理桥（`/banyan/api/*` → 引擎） |
 | `backend/open_webui/main.py` | 仅一行 import + 一行 include_router（钩点③的 backend 侧，登记在案） |
+| `backend/open_webui/routers/openai.py` | 仅两处：流式转发包 `banyan_passthrough_wrapper` + 非流式 `strip_banyan_sse_lines`（§2 透传链路，登记在案） |
+| `backend/open_webui/utils/banyan_stream.py`、`backend/tests/` | 透传实现（纯标准库）与单测 |
 
 ---
 
@@ -51,6 +53,28 @@ data:{"banyan":{"type":"plan","plan_id":"...","status":"pending", ...}}
 
 fork 后端把它作为 socket 事件 `{type:'banyan', data:<BanyanEvent>}` 转发到前端
 （钩点①消费）。权威 TypeScript 定义：`src/lib/components/banyan/types.ts`。
+
+### 透传链路（backend，WE-3B）
+
+`backend/open_webui/routers/openai.py` 的 `/chat/completions` 代理流式段把私有行
+接入前端事件通道，与 `status` 同机制：
+
+1. **流式**：`generate_chat_completion` 的 SSE 返回包裹
+   `banyan_passthrough_wrapper(stream_wrapper(r))`（实现：
+   `backend/open_webui/utils/banyan_stream.py`，纯标准库）。上游行
+   `data:{"banyan":{...}}` 被逐行即时改写为 Open WebUI 既有事件线格式
+   `data:{"event":{"type":"banyan","data":{...}}}`——middleware 流处理循环
+   （`utils/middleware.py`）对含 `event` 键的 chunk 走 `event_emitter` 推送，
+   前端 socket 即收到 `{type:'banyan', data:<BanyanEvent>}`。逐行即时、
+   不缓冲整段；坏 JSON 行、非 banyan 行、`[DONE]` 一律逐字节原样透传，
+   绝不进错误路径。
+2. **非流式**：不转发编排事件。若正文被 banyan 行污染导致 JSON 解析回退文本，
+   用 `strip_banyan_sse_lines` 剥离私有行后按 JSON 返回（忽略而非报错）。
+3. 上游直连模式（`request.state.direct`）沿用上游 `event` chunk 的既有语义
+   （不经 socket，随 HTTP 流透传给客户端）。
+
+单测：`backend/tests/test_banyan_passthrough.py`
+（`cd backend && python3 -m pytest tests/test_banyan_passthrough.py -q`）。
 
 ### 事件一览（五组件映射）
 
@@ -117,12 +141,13 @@ git fetch upstream --tags
 # 1) 从上游主分支开合并分支
 git checkout -b upstream-merge-YYYYQX banyan
 git merge --no-ff upstream/main
-#    预期冲突面 = §1 钩点清单中的 4 个文件（Chat.svelte / ResponseMessage.svelte /
-#    Sidebar.svelte / main.py）。逐一手工核对：
+#    预期冲突面 = §1 钩点清单中的 5 个文件（Chat.svelte / ResponseMessage.svelte /
+#    Sidebar.svelte / main.py / openai.py）。逐一手工核对：
 #    - Chat.svelte：确认 banyan 分支仍在事件分发链上、loadChat 恢复逻辑仍在；
 #    - ResponseMessage.svelte：确认 BanyanEvents 挂载点仍在正文上方；
 #    - Sidebar.svelte：确认任务分区仍在；
-#    - main.py：确认 banyan router 的 import 与 include_router 仍在。
+#    - main.py：确认 banyan router 的 import 与 include_router 仍在；
+#    - openai.py：确认 banyan_passthrough_wrapper / strip_banyan_sse_lines 两处仍在。
 
 # 2) 回归验证
 npm ci && npm run build          # 前端全绿
@@ -137,6 +162,8 @@ git push origin banyan
 
 合并检查单：
 - [ ] 三钩点全部存活（grep `banyanEvents` / `BanyanEvents` / `sidebar-banyan` / `banyan.router`）
+- [ ] openai.py 透传两处存活（grep `banyan_passthrough_wrapper` / `strip_banyan_sse_lines`），
+      `cd backend && python3 -m pytest tests/test_banyan_passthrough.py -q` 全绿
 - [ ] `src/lib/components/banyan/`、`src/routes/(app)/(banyan)/`、`src/lib/apis/banyan/` 未被上游删除或重命名冲突
 - [ ] `npm run build` 全绿
 - [ ] mock story 冒烟通过（五路由 + 组件）
@@ -144,5 +171,7 @@ git push origin banyan
 
 ## 6. 回滚
 
-fork 定制全部可剥离：revert 三钩点的 4 个文件改动 + 删除四个新目录/文件即可
+fork 定制全部可剥离：revert 三钩点的 5 个文件改动（含 openai.py 两处）+ 删除
+新目录/文件（`src/lib/components/banyan/`、`src/routes/(app)/(banyan)/`、
+`src/lib/apis/banyan/`、`banyan.py`、`banyan_stream.py`、`backend/tests/`）即可
 回到原生 Open WebUI；chat.db 中残留的 `banyanEvents` 字段会被原生代码忽略。
