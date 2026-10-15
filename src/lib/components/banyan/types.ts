@@ -80,6 +80,8 @@ export type BanyanToolEvent = {
 export type BanyanSubagentEvent = {
 	type: 'subagent';
 	subagent_id: string;
+	/** 引擎线格式原字段（v1 编排行）：子代理工单 id——停止对端 /work/{work_id}/cancel */
+	work_id?: string;
 	role?: string;
 	title?: string;
 	latest_action?: string;
@@ -90,6 +92,10 @@ export type BanyanSubagentEvent = {
 	ended_at?: number;
 	ts?: number;
 };
+
+/** 子代理卡的稳定键与停止目标 id：引擎线格式给 work_id，mock/story 给 subagent_id */
+export const subagentKey = (e: BanyanSubagentEvent): string =>
+	e.subagent_id ?? e.work_id ?? '';
 
 /** branch 事件 → TreeSwitcher（同一消息块只保留最新一份分支 pills） */
 export type BanyanBranchEvent = {

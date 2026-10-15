@@ -400,20 +400,18 @@ export const switchBanyanTreeNode = async (
 	return request('POST', `/chats/${encodeURIComponent(chatId)}/tree/switch`, { node_id: nodeId });
 };
 
-export const rerunBanyanTreeNode = async (
-	chatId: string,
-	nodeId: string,
-	token: string = localStorage.token
-) => {
-	return request('POST', `/chats/${encodeURIComponent(chatId)}/tree/rerun`, { node_id: nodeId });
-};
+// RF-Z:rerunBanyanTreeNode 已随 /tree 页死按钮摘除(引擎无 /chats/{id}/tree/rerun
+// 对端,实测 404)——分支切换仅消息流 TreeSwitcher 的 switch 通道保留(对端同样
+// 缺位,待引擎补树写端点后统一恢复)。
 
 ////////////////////////////
-// 子代理 /subagents
+// 子代理停止（引擎对端：POST /api/work/{work_id}/cancel）
 ////////////////////////////
 export const stopBanyanSubagent = async (
 	subagentId: string,
 	token: string = localStorage.token
 ) => {
-	return request('POST', `/subagents/${encodeURIComponent(subagentId)}/stop`);
+	// RF-Z：引擎真实对端是 /work/{id}/cancel（子代理工单取消）——
+	// 旧 /subagents/{id}/stop 引擎无此路由（死按钮，RV-final 携带 P1）。
+	return request('POST', `/work/${encodeURIComponent(subagentId)}/cancel`);
 };

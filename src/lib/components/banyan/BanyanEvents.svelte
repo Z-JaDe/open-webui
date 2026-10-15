@@ -100,7 +100,10 @@
 	const subagentStopHandler = async (subagent: BanyanSubagentEvent) => {
 		if (mock) return;
 		try {
-			await stopBanyanSubagent(subagent.subagent_id);
+			// RF-Z:引擎对端=POST /work/{id}/cancel;引擎线格式 id 在 work_id
+			//(v1 编排行),mock/story 形态回落 subagent_id。成功提示由
+			// SubagentCard.stopHandler 统一出(不双 toast)。
+			await stopBanyanSubagent(subagent.work_id ?? subagent.subagent_id);
 		} catch (error) {
 			toast.error(`${$i18n.t('Failed to stop subagent')}: ${error}`);
 		}

@@ -117,8 +117,12 @@ history），历史载入时在钩点①恢复。事件正本仍在引擎 K1，c
 
 引擎端点约定（前端 `$lib/apis/banyan/index.ts` 为权威调用方）：
 `/registry`、`/cards`、`/cards/{id}/resolve`、`/audit`、`/plans/{id}`、
-`/plans/{id}/resolve`、`/chats/{id}/tree`、`/chats/{id}/tree/switch`、
-`/chats/{id}/tree/rerun`、`/subagents/{id}/stop`。
+`/plans/{id}/resolve`、`/chats/{id}/tree`、`/work/{id}/cancel`
+（RF-Z：子代理停止的真实引擎对端；旧 `/subagents/{id}/stop` 引擎无此路由已弃，
+`/chats/{id}/tree/switch`、`/chats/{id}/tree/rerun` 仅消息流 TreeSwitcher/story
+面在调用、引擎侧暂无对端）。
+路径穿越防护：`/banyan/api/*` 转发前经 `utils/banyan_bridge.safe_bridge_path`
+校验，解码后含 `..` 段/反斜杠一律 400 不转发（P2-f-1）。
 
 ---
 

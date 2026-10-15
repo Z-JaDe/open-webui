@@ -1,7 +1,9 @@
 <script lang="ts">
-	// /tree/[chatId] — 会话树视图：节点=轮（user→assistant），点击切换/重跑
+	// /tree/[chatId] — 会话树视图：节点=轮（user→assistant），只读投影
 	// （钩点③，统一设计 §6.1 / §8 G3；§6.3 会话树）
-	// 数据源：GET /banyan/api/chats/:chatId/tree、POST .../tree/switch、POST .../tree/rerun
+	// 数据源：GET /banyan/api/chats/:chatId/tree
+	// （RF-Z 死按钮摘除：switch/rerun 引擎无对端端点，实测落 404——诚实 UI
+	// 原则，摘按钮保留只读树；分支切换经消息流 TreeSwitcher 恢复对端后再上。）
 	// story 开关：?mock=1 → 内置样例数据（不请求引擎）。
 	import { onMount, getContext } from 'svelte';
 	import type { Writable } from 'svelte/store';
@@ -9,19 +11,13 @@
 	import { toast } from 'svelte-sonner';
 
 	import type i18nType from '$lib/i18n';
-	import {
-		getBanyanTree,
-		rerunBanyanTreeNode,
-		switchBanyanTreeNode,
-		type BanyanTreeSnapshot
-	} from '$lib/apis/banyan';
+	import { getBanyanTree, type BanyanTreeSnapshot } from '$lib/apis/banyan';
 
 	const i18n = getContext<Writable<i18nType>>('i18n');
 
 	let loaded = false;
 	let error: string | null = null;
 	let snapshot: BanyanTreeSnapshot | null = null;
-	let busyNodeId: string | null = null;
 
 	const banyanLayout: any = getContext('banyanLayout') ?? {};
 	$: banyanLayout.setHeader?.({
@@ -59,12 +55,6 @@
 	$: nodesById = Object.fromEntries(nodes.map((node) => [node.id, node]));
 	$: roots = nodes.filter((node) => !node.parent_id || !nodesById[node.parent_id]);
 
-	const descendants = (nodeId: string): string[] => {
-		const node = nodesById[nodeId];
-		if (!node) return [nodeId];
-		return [nodeId, ...node.children.flatMap(descendants)];
-	};
-
 	// 父链深度（防御环：上限 64）
 	const nodeDepth = (node: (typeof nodes)[number]): number => {
 		let depth = 0;
@@ -90,42 +80,6 @@
 				return 'border-dashed border-gray-300 dark:border-gray-700 opacity-60';
 			default:
 				return 'border-gray-200 dark:border-gray-700';
-		}
-	};
-
-	const switchHandler = async (nodeId: string) => {
-		if (!snapshot || busyNodeId) return;
-		busyNodeId = nodeId;
-		try {
-			if (!new URLSearchParams(window.location.search).has('mock')) {
-				await switchBanyanTreeNode($page.params.chatId, nodeId);
-			}
-			// 本地投影：切换后该分支沿途节点变 active（权威状态由引擎回流/重取）
-			const path = new Set(descendants(nodeId));
-			snapshot = {
-				...snapshot,
-				nodes: snapshot.nodes.map((node) => ({ ...node, active: path.has(node.id) }))
-			};
-			toast.success($i18n.t('Switched branch'));
-		} catch (e) {
-			toast.error(`${e}`);
-		} finally {
-			busyNodeId = null;
-		}
-	};
-
-	const rerunHandler = async (nodeId: string) => {
-		if (!snapshot || busyNodeId) return;
-		busyNodeId = nodeId;
-		try {
-			if (!new URLSearchParams(window.location.search).has('mock')) {
-				await rerunBanyanTreeNode($page.params.chatId, nodeId);
-			}
-			toast.success($i18n.t('Rerun started'));
-		} catch (e) {
-			toast.error(`${e}`);
-		} finally {
-			busyNodeId = null;
 		}
 	};
 
@@ -165,24 +119,6 @@
 						{#if node.summary}
 							<div class="mt-1 text-[11px] text-gray-500 dark:text-gray-400 truncate">{node.summary}</div>
 						{/if}
-						<div class="mt-1.5 flex items-center gap-2">
-							<button
-								type="button"
-								class="px-2 py-0.5 text-[11px] rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 transition"
-								disabled={node.active || busyNodeId === node.id}
-								on:click={() => switchHandler(node.id)}
-							>
-								{$i18n.t('Switch here')}
-							</button>
-							<button
-								type="button"
-								class="px-2 py-0.5 text-[11px] rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 transition"
-								disabled={busyNodeId === node.id}
-								on:click={() => rerunHandler(node.id)}
-							>
-								{$i18n.t('Rerun')}
-							</button>
-						</div>
 					</div>
 				</div>
 			{/each}

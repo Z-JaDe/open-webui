@@ -38,6 +38,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from open_webui.utils.auth import get_verified_user
+from open_webui.utils.banyan_bridge import safe_bridge_path
 
 log = logging.getLogger(__name__)
 
@@ -108,7 +109,17 @@ async def banyan_proxy(
     user: Any = Depends(get_verified_user),
 ):
     """把 /banyan/api/* 请求 1:1 转发到引擎，流式回传（兼容 SSE）。"""
-    target_url = f"{BANYAN_ENGINE_URL}/api/{path}"  # 引擎端点带 /api 前缀(E2E 修正)
+    # P2-f-1:点段/反斜杠路径一律 400,不转发——{path:path} 原样捕获的点段
+    # 会被 httpx 按 RFC3986 对目标 URL 做点段消除,`/api/../../v1/models`
+    # 逃出 /api 命名空间(设 BANYAN_TOKEN 时静态凭证自动随行直达引擎
+    # /v1、/docs、/openapi.json)。原样 ../、%2e%2e、..%2f、双重编码全覆盖。
+    safe_path = safe_bridge_path(path)
+    if safe_path is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="banyan bridge: path traversal rejected",
+        )
+    target_url = f"{BANYAN_ENGINE_URL}/api/{safe_path}"  # 引擎端点带 /api 前缀(E2E 修正)
 
     # RFF P1:Authorization 替换而非叠加——剥离客户端带来的头(大小写不敏感),
     # 防止 dict 里 "authorization" 与 "Authorization" 两键并存、httpx 双发、
