@@ -181,6 +181,56 @@ export const resolveBanyanCard = async (
 };
 
 ////////////////////////////
+// 知识卡(K3)/registry 页区块(RFF P1:此前 /cards 页接的是审卡队列,
+// 知识卡真端点 /api/knowledge/cards 无人消费——F6 缺口)
+////////////////////////////
+export type BanyanKnowledgeCard = {
+	id: string;
+	/** 卡名:索引 path 基名去扩展(引擎 cards 表无 title 列) */
+	name: string;
+	kind?: string;
+	scope?: string;
+	weight?: number;
+	status: string;
+	used?: number;
+	wrong?: number;
+	updated?: number;
+};
+
+export const getBanyanKnowledgeCards = async (
+	query: { status?: string; limit?: number } = {},
+	token: string = localStorage.token
+): Promise<{ cards: BanyanKnowledgeCard[]; total: number }> => {
+	const params = new URLSearchParams();
+	if (query.status) params.set('status', query.status);
+	params.set('limit', String(query.limit ?? 200));
+	const res = await fetch(`${BANYAN_API_BASE_URL}/knowledge/cards?${params.toString()}`, {
+		method: 'GET',
+		headers: { Authorization: `Bearer ${token}` }
+	});
+	if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+	// 引擎 GET /api/knowledge/cards 返回
+	// {cards:[{id,path,kind,scope,status,weight,used,wrong,updated}], total} → BanyanKnowledgeCard
+	const raw: any = await res.json();
+	const cards = asArray(raw?.cards).map((c: any): BanyanKnowledgeCard => {
+		const path = typeof c?.path === 'string' ? c.path : '';
+		const base = path.split('/').pop()?.replace(/\.(md|markdown)$/i, '') || '';
+		return {
+			id: String(c?.id ?? ''),
+			name: base || String(c?.id ?? ''),
+			kind: c?.kind ? String(c.kind) : undefined,
+			scope: c?.scope ? String(c.scope) : undefined,
+			weight: typeof c?.weight === 'number' ? c.weight : undefined,
+			status: String(c?.status ?? 'unknown'),
+			used: Number(c?.used ?? 0),
+			wrong: Number(c?.wrong ?? 0),
+			updated: toMs(c?.updated)
+		};
+	});
+	return { cards, total: Number(raw?.total ?? cards.length) };
+};
+
+////////////////////////////
 // 事件浏览 /audit
 ////////////////////////////
 export const getBanyanAuditEvents = async (
@@ -210,7 +260,7 @@ export const getBanyanAuditEvents = async (
 ////////////////////////////
 // 方案与波次 /plans
 ////////////////////////////
-// 引擎 plan 状态(open|pending_approval|rejected|running|blocked|finished)→ 页面四态
+// 引擎 plan 状态(open|pending_approval|rejected|running|blocked|finished|revised)→ 页面四态
 const PLAN_STATUS_MAP: Record<string, import('$lib/components/banyan/types').BanyanPlanEvent['status']> = {
 	open: 'pending',
 	pending_approval: 'pending',
@@ -218,7 +268,8 @@ const PLAN_STATUS_MAP: Record<string, import('$lib/components/banyan/types').Ban
 	running: 'approved',
 	blocked: 'approved',
 	finished: 'approved',
-	rejected: 'rejected'
+	rejected: 'rejected',
+	revised: 'revised'
 };
 
 // 引擎 orch_tasks.status → WaveBoard 六态(词表一致,透传兜底 pending)

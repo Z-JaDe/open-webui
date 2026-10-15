@@ -9,8 +9,11 @@ fork 自家 FastAPI 增加 /banyan/api/* 反向代理，把前端五路由与组
     /banyan/api/plans/x/resolve  ->  {BANYAN_ENGINE_URL}/plans/x/resolve
   若引擎挂在子路径下，直接把子路径写进 BANYAN_ENGINE_URL 即可
   （例如 http://engine:8420/api/v1）。
-- 鉴权桥接：
-  - env `BANYAN_TOKEN` 设置时，用它作为静态 `Authorization: Bearer <token>`；
+- 鉴权桥接（RFF P1 修正：Authorization 必须**替换**而非叠加）：
+  - env `BANYAN_TOKEN` 设置时，剥离客户端自带的 Authorization 头（大小写不敏感），
+    以静态 `Authorization: Bearer <token>` 转发——此前 dict 大小写敏感两键并存、
+    httpx 依序双发，引擎 Starlette 首者胜取到客户端 webui JWT，静态桥对自家
+    前端失效、hub 模式整桥 401（FA-v2 §9-3）；
   - 未设置时，透传前端请求自带的 Authorization 头。
 - 前端仍走 Open WebUI 自己的登录态（get_verified_user），未登录用户不能借道。
 
@@ -107,13 +110,19 @@ async def banyan_proxy(
     """把 /banyan/api/* 请求 1:1 转发到引擎，流式回传（兼容 SSE）。"""
     target_url = f"{BANYAN_ENGINE_URL}/api/{path}"  # 引擎端点带 /api 前缀(E2E 修正)
 
+    # RFF P1:Authorization 替换而非叠加——剥离客户端带来的头(大小写不敏感),
+    # 防止 dict 里 "authorization" 与 "Authorization" 两键并存、httpx 双发、
+    # 引擎首者胜取到 webui JWT 而整桥 401。
+    client_authorization = request.headers.get("authorization", "")
     headers = {
         key: value
         for key, value in request.headers.items()
-        if key.lower() not in FORWARD_HEADERS_BLOCKLIST
+        if key.lower() not in FORWARD_HEADERS_BLOCKLIST and key.lower() != "authorization"
     }
     if BANYAN_TOKEN:
         headers["Authorization"] = f"Bearer {BANYAN_TOKEN}"
+    elif client_authorization:
+        headers["Authorization"] = client_authorization  # 未设静态 token:透传原头
     headers.pop("cookie", None)
 
     body = await request.body()
