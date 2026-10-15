@@ -260,17 +260,19 @@ export const getBanyanAuditEvents = async (
 ////////////////////////////
 // 方案与波次 /plans
 ////////////////////////////
-// 引擎 plan 状态(open|pending_approval|rejected|running|blocked|finished|revised)→ 页面四态
-const PLAN_STATUS_MAP: Record<string, import('$lib/components/banyan/types').BanyanPlanEvent['status']> = {
-	open: 'pending',
-	pending_approval: 'pending',
-	approved: 'approved',
-	running: 'approved',
-	blocked: 'approved',
-	finished: 'approved',
-	rejected: 'rejected',
-	revised: 'revised'
-};
+	// 引擎 plan 状态(open|pending_approval|rejected|running|blocked|finished|revised|
+	// orphaned[TA-2:重启孤儿复位,可重新批准重入])→ 页面五态
+	const PLAN_STATUS_MAP: Record<string, import('$lib/components/banyan/types').BanyanPlanEvent['status']> = {
+		open: 'pending',
+		pending_approval: 'pending',
+		approved: 'approved',
+		running: 'approved',
+		blocked: 'approved',
+		finished: 'approved',
+		rejected: 'rejected',
+		revised: 'revised',
+		orphaned: 'orphaned'
+	};
 
 // 引擎 orch_tasks.status → WaveBoard 六态(词表一致,透传兜底 pending)
 const TASK_STATUS_MAP: Record<string, import('$lib/components/banyan/types').BanyanTaskStatus> = {

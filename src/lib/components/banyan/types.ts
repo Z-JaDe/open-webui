@@ -28,8 +28,8 @@ export type BanyanPlanEvent = {
 	type: 'plan';
 	plan_id: string;
 	title?: string;
-	/** pending=待批准；approved/rejected/revised 为 resolve 后回填 */
-	status: 'pending' | 'approved' | 'rejected' | 'revised';
+	/** pending=待批准；approved/rejected/revised 为 resolve 后回填；orphaned=重启孤儿复位（可重新批准重入） */
+	status: 'pending' | 'approved' | 'rejected' | 'revised' | 'orphaned';
 	/** 核心假设 */
 	hypothesis?: string;
 	waves: BanyanPlanWave[];
@@ -126,7 +126,8 @@ export const BANYAN_PLAN_STATUS_LABEL: Record<BanyanPlanEvent['status'], string>
 	pending: '待批准',
 	approved: '已批准',
 	rejected: '已驳回',
-	revised: '已选 B'
+	revised: '已选 B',
+	orphaned: '已中断（重启复位，可重新批准）'
 };
 
 export const BANYAN_TASK_STATUS_LABEL: Record<BanyanTaskStatus, string> = {

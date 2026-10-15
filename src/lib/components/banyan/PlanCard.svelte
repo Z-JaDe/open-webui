@@ -3,7 +3,7 @@
 
 	事件 schema → 渲染契约：
 	  输入 BanyanPlanEvent（src/lib/components/banyan/types.ts）：
-	    { type:'plan', plan_id, title?, status:'pending'|'approved'|'rejected'|'revised',
+	    { type:'plan', plan_id, title?, status:'pending'|'approved'|'rejected'|'revised'|'orphaned'(重启复位,展示为已中断态),
 	      hypothesis?, waves:[{index,title?,depends_on?,tasks:[{task_id,title,deps?}]}],
 	      acceptance?, risks?, rollback?, alt_option?, ts? }
 	  渲染：结构化方案卡（假设/波次/验收/风险/回滚）；
