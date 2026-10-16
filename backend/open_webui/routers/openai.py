@@ -40,6 +40,7 @@ from open_webui.models.users import UserModel
 from open_webui.utils.access_control import check_model_access, has_connection_access, has_permission
 from open_webui.utils.anthropic import ANTHROPIC_VERSION, get_anthropic_models, is_anthropic_url
 from open_webui.utils.auth import get_admin_user, get_verified_user
+from open_webui.utils.banyan_conv import resolve_conv_header
 from open_webui.utils.banyan_stream import banyan_passthrough_wrapper, strip_banyan_sse_lines
 from open_webui.utils.headers import get_headers_and_cookies, include_user_info_headers
 from open_webui.utils.json_codec import JSONCodec
@@ -1506,6 +1507,14 @@ async def generate_chat_completion(
             payload['logit_bias'] = JSONCodec.loads(logit_bias)
 
     headers, cookies = await get_headers_and_cookies(request, url, key, api_config, metadata, user=user)
+
+    # banyan P0（会话映射，utils/banyan_conv.py）：转发目标是引擎且为真实对话轮
+    # （非 title/tags 等后台任务）时，注入 X-Banyan-Conv = 该 WebUI chat 绑定的
+    # 引擎会话 id（chat.meta.banyan_conv_id，首条消息时经引擎 API 创建并回写）。
+    # 映射不可得时不注入头——降级为引擎默认实例（修复前行为），绝不阻断对话。
+    banyan_conv = await resolve_conv_header(metadata, url)
+    if banyan_conv:
+        headers['X-Banyan-Conv'] = banyan_conv
 
     is_responses = api_config.get('api_type') == 'responses'
 

@@ -984,6 +984,23 @@ class ChatTable:
             if removed:
                 await self.delete_orphan_tags_for_user(list(removed), user.id, db=session)
 
+    async def update_chat_meta_by_id(self, id: str, meta_patch: dict) -> dict | None:
+        """banyan fork: 读-合并-写 chat.meta 列(仅 meta 列,不触碰 chat blob)。
+
+        与 update_chat_tags_by_id 同款写法,供 banyan conv 绑定等 fork 侧 meta
+        持久化使用;返回合并后的 meta,chat 不存在返回 None。
+        """
+        async with get_async_db_context() as session:
+            row = (await session.execute(select(Chat.meta).filter_by(id=id))).one_or_none()
+            if row is None:
+                return None
+            merged = {**(row[0] or {}), **(meta_patch or {})}
+            await session.execute(
+                update(Chat).filter_by(id=id).values(meta=merged)
+            )
+            await session.commit()
+            return merged
+
     async def get_chat_title_by_id(self, id: str) -> str | None:
         async with get_async_db_context() as session:
             result = await session.execute(select(Chat.title).filter_by(id=id))
