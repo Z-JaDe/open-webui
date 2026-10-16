@@ -66,7 +66,7 @@ K0 工作记忆（Pi 会话，私有）→ K1 事件正本（jsonl）→ K2 情�
 
 单机三进程：banyan 引擎(:8000) + Pi sidecar(:8100) + banyan-webui(:8080，fork Open WebUI 0.12.1 Docker)。对话历史在 WebUI 库（对话面缓存），审计正本在 K1，文件状态在 git——三层各自备份。多设备=WebUI PWA/任意浏览器。
 
-**账号**：WebUI 自带账号体系（管理员注册制）；引擎对外用静态 bearer；Supabase 账号面退役（hub 联邦代码留档可选，不默认加载）。
+**账号**：WebUI 自带账号体系（管理员注册制）；引擎对外用静态 bearer（`BANYAN_V1_TOKEN` 强制 > `BANYAN_OPEN=1` 放行 > fail-closed，全端点统一）；Supabase 账号面与 hub 联邦已整体删除（2026-10-16 清理轮）。
 
 ## 与 v1 设计的差异对照
 
@@ -74,7 +74,7 @@ K0 工作记忆（Pi 会话，私有）→ K1 事件正本（jsonl）→ K2 情�
 |---|---|---|
 | MAF 作为 agent 框架 | Pi SDK 唯一内核，MAF 退役 | MAF 静态图/GroupChat 与波次模型冲突；Pi 五职责全中且源码验证 |
 | 工作台 React 自研前端 | fork Open WebUI | 聊天产品是无底洞；WebUI 形态满意，短板（多Agent渲染）由 fork 补齐 |
-| Supabase 账号面 | WebUI 账号体系 + 引擎静态 bearer | 无消费方；联邦代码留档 |
+| Supabase 账号面 + hub 联邦 | WebUI 账号体系 + 引擎静态 bearer（三态统一） | 无消费方；已整体删除（含 E2B/Kruise 沙箱与旧 frontend/，仓库 2.3G→318M） |
 | 边级依赖（隐含） | 波次帧+依赖单据两级 | 边级 DAG 是伪需求（LLM 拆解假精度） |
 | 定期回归（隐含义务） | 事件道≥90%+定期道投机排期 | 防噪音；定期是投机不是义务 |
 | 知识分层/攻击审查/递归预算/级联 | **全部保留**，接主流程 | 设计意图验证成立 |
