@@ -42,6 +42,7 @@ from open_webui.tasks import get_response_streams_by_chat_id, has_active_tasks, 
 from open_webui.utils.access_control import filter_allowed_access_grants, has_permission
 from open_webui.utils.access_control.folders import has_folder_write_access
 from open_webui.utils.auth import bearer_security, get_admin_user, get_current_user, get_verified_user
+from open_webui.utils.banyan_conv import conv_id_for_chat, patch_engine_session
 from open_webui.utils.chat_fork import build_fork_history
 from open_webui.utils.context_compaction import compact_chat_branch, get_chat_context_usage
 from open_webui.utils.json_codec import JSONCodec
@@ -1452,7 +1453,20 @@ async def update_chat_by_id(
     chat = await Chats.get_chat_by_id_and_user_id(id, user.id, db=db)
     if chat:
         touch = 'history' in form_data.chat or 'messages' in form_data.chat
+        # banyan quick-win（标题单向同步）：用户手动改名（新 title ≠ 原值）→ 同步
+        # 引擎 session.title（PATCH，title_source=custom）。日常消息保存也带同值
+        # title，此时不触发；引擎侧失败只记日志，不影响 WebUI 侧保存。
+        _banyan_new_title = form_data.chat.get('title')
+        _banyan_renamed = (
+            isinstance(_banyan_new_title, str)
+            and bool(_banyan_new_title.strip())
+            and _banyan_new_title != chat.title
+        )
         chat = await Chats.update_chat_by_id(id, form_data.chat, db=db, touch=touch)
+        if _banyan_renamed:
+            _banyan_conv = await conv_id_for_chat(id)
+            if _banyan_conv:
+                await patch_engine_session(_banyan_conv, title=_banyan_new_title)
         if form_data.variables is not None:
             chat = (
                 await Chats.update_chat_variables_by_id(
@@ -1684,6 +1698,10 @@ async def delete_chat_by_id(
     # Cancel any in-flight LLM tasks (streaming, title/tags generation) before
     # deleting the chat to prevent orphaned requests.
     await stop_item_tasks(request.app.state.redis, id)
+    # banyan quick-win（删除→归档）：chat 行删除前取引擎会话绑定（行删了 meta 就
+    # 没了）；删除成功后把引擎 session 归档（PATCH archived=true，引擎保留正本，
+    # 对齐"分支靠指针不靠删除"）。引擎侧失败只记日志，不阻断 WebUI 删除。
+    banyan_conv = await conv_id_for_chat(id)
     await Chats.delete_orphan_tags_for_user(chat.meta.get('tags', []), chat.user_id, threshold=1, db=db)
 
     # Cascade to internal child chats spawned from this one.
@@ -1697,6 +1715,8 @@ async def delete_chat_by_id(
         result = await Chats.delete_chat_by_id_and_user_id(id, user.id, db=db)
 
     if result:
+        if banyan_conv:
+            await patch_engine_session(banyan_conv, archived=True)
         await publish_event(
             request,
             EVENTS.CHAT_DELETED,
