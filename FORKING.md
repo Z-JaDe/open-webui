@@ -38,8 +38,10 @@
 | `src/routes/(app)/(banyan)/` | 五路由 + 共享布局 + waves/tree 入口页 |
 | `backend/open_webui/routers/banyan.py` | 代理桥（`/banyan/api/*` → 引擎） |
 | `backend/open_webui/main.py` | 仅一行 import + 一行 include_router（钩点③的 backend 侧，登记在案） |
-| `backend/open_webui/routers/openai.py` | 仅两处：流式转发包 `banyan_passthrough_wrapper` + 非流式 `strip_banyan_sse_lines`（§2 透传链路，登记在案） |
-| `backend/open_webui/utils/banyan_stream.py`、`backend/tests/` | 透传实现（纯标准库）与单测 |
+| `backend/open_webui/routers/openai.py` | 三处：流式转发包 `banyan_passthrough_wrapper` + 非流式 `strip_banyan_sse_lines`（§2 透传链路）+ conv 头注入（§3b，均在 `generate_chat_completion` 内，登记在案） |
+| `backend/open_webui/routers/chats.py` | 两处（§3b quick-win）：`update_chat_by_id` 改名→引擎 title 同步；`delete_chat_by_id` 删除→引擎归档（登记在案） |
+| `backend/open_webui/models/chats.py` | 一个方法：`update_chat_meta_by_id`（conv 绑定持久化用，登记在案） |
+| `backend/open_webui/utils/banyan_stream.py`、`banyan_conv.py`、`backend/tests/` | 透传/conv 绑定实现与单测 |
 
 ---
 
@@ -126,6 +128,75 @@ history），历史载入时在钩点①恢复。事件正本仍在引擎 K1，c
 
 ---
 
+## 3b. conv 绑定（P0 会话映射）+ quick-win 对接
+
+实现：`backend/open_webui/utils/banyan_conv.py`（引擎访问复用 §3 同款 env）。
+
+**机制**：WebUI chat ↔ 引擎 session 1:1。chat 首条消息转发前
+（`routers/openai.py generate_chat_completion`，`get_headers_and_cookies` 之后）
+判定：目标是引擎（scheme+netloc 与 `BANYAN_ENGINE_URL` 相等）且为真实对话轮
+（metadata 无 `task` 键、chat_id 已落库）→ 取 `chat.meta.banyan_conv_id`；
+没有则 `POST {BANYAN_ENGINE_URL}/api/projects/{默认项目}/sessions` 建会话并回写
+meta，随后注入 `X-Banyan-Conv` 头（引擎 `_resolve_conv` 头优先）。映射不可得时
+不注入头（降级为引擎默认实例，即修复前行为），**绝不阻断对话**。
+
+注意边界：
+- 后台任务轮（title/tags/follow_up/autocomplete/query 生成，metadata 带
+  `task`）**不**注入头——否则任务 prompt 会作为正式 turn 落进绑定会话污染
+  K1 正本（修复前默认 conv 的标题即被 title 任务 prompt 污染的实证）。
+- 引擎 DB 若重置而 WebUI meta 仍存旧 conv id，引擎按"no such session"404
+  该轮（显式失败，不静默串话）；清理 chat.meta.banyan_conv_id 即恢复。
+
+**quick-win 对接**（`routers/chats.py`，均容错不阻断 WebUI 侧操作）：
+- 对话改名（`update_chat_by_id`，title 实变时）→ `PATCH /api/sessions/{conv}`
+  `{title}`（引擎 `title_source=custom`）。
+- 对话删除（`delete_chat_by_id`）→ `PATCH /api/sessions/{conv}` `{archived:true}`
+  （引擎保留正本，对齐"分支靠指针不靠删除"）。
+
+单测：`backend/tests/test_banyan_conv.py`。
+
+---
+
+## 3c. 部署（env-only 开关 + 嵌入模型本地化）
+
+**env-only 开关**（只进进程 env，写 DB 无效；源自审计 11b 清单，见
+`docs/goal/功能适配审计.md`）：
+
+```bash
+ENABLE_SIGNUP=false
+ENABLE_OLLAMA_API=false
+ENABLE_DIRECT_CONNECTIONS=false
+ENABLE_TOOL_SERVERS=false        # 连带 terminals 关闭
+ENABLE_TOOLS=false
+ENABLE_FUNCTIONS=false
+ENABLE_CODE_EXECUTION=false
+ENABLE_CODE_INTERPRETER=false
+ENABLE_ADMIN_ANALYTICS=false
+```
+
+其余（DB `config` 表热生效的开关、i18n、任务后台收敛等）按审计 §11a 的 SQL
+清单写库即可，无需重启。当前运行实例启动脚本：`/tmp/run-webui.sh`。
+
+**RAG 嵌入本地化**（审计域3）：
+- 选型 `BAAI/bge-small-zh-v1.5`（中文优先，512 维）；DB 键
+  `rag.embedding_engine=""`（**空串=本地 sentence-transformers**，不是
+  "sentence-transformers" 字面量——写错会导致 boot 时
+  `Unknown embedding engine` 起不来）、
+  `rag.embedding_model="/tmp/webui-data/models/bge-small-zh-v1.5"`。
+- 模型文件预下载为**普通目录**（非 HF cache）：hf-mirror 对 python TLS 栈
+  （requests/httpx）返回 308 跳回 huggingface.co（不可达），对 curl 正常——
+  是镜像站的客户端指纹分流；故用 curl 批量下载到 DATA_DIR（当前源用
+  ModelScope `https://modelscope.cn/api/v1/models/BAAI/bge-small-zh-v1.5/repo?FilePath=<f>`，
+  hf-mirror `resolve/main` 亦可但常 429 限流）。文件清单：
+  `config.json modules.json sentence_bert_config.json config_sentence_transformers.json
+  special_tokens_map.json tokenizer_config.json vocab.txt tokenizer.json
+  1_Pooling/config.json model.safetensors`。
+- venv 兼容性：torch 按 NumPy 1.x 编译，需 `numpy<2` + `scipy<1.14`（2.x 会
+  `Numpy is not available` / `np.long` 报错）。
+
+
+---
+
 ## 4. mock / story 开关
 
 无法真连引擎时：
@@ -145,17 +216,21 @@ git fetch upstream --tags
 # 1) 从上游主分支开合并分支
 git checkout -b upstream-merge-YYYYQX banyan
 git merge --no-ff upstream/main
-#    预期冲突面 = §1 钩点清单中的 5 个文件（Chat.svelte / ResponseMessage.svelte /
-#    Sidebar.svelte / main.py / openai.py）。逐一手工核对：
+#    预期冲突面 = §1 钩点清单中的 7 个文件（Chat.svelte / ResponseMessage.svelte /
+#    Sidebar.svelte / main.py / openai.py / chats.py / models/chats.py）。逐一手工核对：
 #    - Chat.svelte：确认 banyan 分支仍在事件分发链上、loadChat 恢复逻辑仍在；
 #    - ResponseMessage.svelte：确认 BanyanEvents 挂载点仍在正文上方；
 #    - Sidebar.svelte：确认任务分区仍在；
 #    - main.py：确认 banyan router 的 import 与 include_router 仍在；
-#    - openai.py：确认 banyan_passthrough_wrapper / strip_banyan_sse_lines 两处仍在。
+#    - openai.py：确认 banyan_passthrough_wrapper / strip_banyan_sse_lines /
+#      resolve_conv_header（X-Banyan-Conv 注入）三处仍在；
+#    - chats.py：确认 update_chat_by_id 的改名同步与 delete_chat_by_id 的
+#      归档钩子（conv_id_for_chat / patch_engine_session）仍在；
+#    - models/chats.py：确认 update_chat_meta_by_id 仍在。
 
 # 2) 回归验证
 npm ci && npm run build          # 前端全绿
-python -m compileall backend     # 后端语法
+python3 -m compileall backend     # 后端语法
 #   手工冒烟：?mock=1 打开 /registry /cards /audit /waves/plan-mock-001 /tree/chat-mock-77
 
 # 3) 合回
@@ -166,8 +241,10 @@ git push origin banyan
 
 合并检查单：
 - [ ] 三钩点全部存活（grep `banyanEvents` / `BanyanEvents` / `sidebar-banyan` / `banyan.router`）
-- [ ] openai.py 透传两处存活（grep `banyan_passthrough_wrapper` / `strip_banyan_sse_lines`），
-      `cd backend && python3 -m pytest tests/test_banyan_passthrough.py -q` 全绿
+- [ ] openai.py 透传两处 + conv 注入存活（grep `banyan_passthrough_wrapper` /
+      `strip_banyan_sse_lines` / `resolve_conv_header`），chats.py 两钩子 +
+      `update_chat_meta_by_id` 存活（grep `conv_id_for_chat`），
+      `cd backend && python3 -m pytest tests/test_banyan_passthrough.py tests/test_banyan_conv.py -q` 全绿
 - [ ] `src/lib/components/banyan/`、`src/routes/(app)/(banyan)/`、`src/lib/apis/banyan/` 未被上游删除或重命名冲突
 - [ ] `npm run build` 全绿
 - [ ] mock story 冒烟通过（五路由 + 组件）
@@ -175,7 +252,9 @@ git push origin banyan
 
 ## 6. 回滚
 
-fork 定制全部可剥离：revert 三钩点的 5 个文件改动（含 openai.py 两处）+ 删除
-新目录/文件（`src/lib/components/banyan/`、`src/routes/(app)/(banyan)/`、
-`src/lib/apis/banyan/`、`banyan.py`、`banyan_stream.py`、`backend/tests/`）即可
-回到原生 Open WebUI；chat.db 中残留的 `banyanEvents` 字段会被原生代码忽略。
+fork 定制全部可剥离：revert 三钩点的 7 个文件改动（含 openai.py 三处、chats.py
+两处、models/chats.py 一处）+ 删除新目录/文件（`src/lib/components/banyan/`、
+`src/routes/(app)/(banyan)/`、`src/lib/apis/banyan/`、`banyan.py`、
+`banyan_stream.py`、`banyan_conv.py`、`backend/tests/`）即可回到原生 Open WebUI；
+chat.db 中残留的 `banyanEvents` / `meta.banyan_conv_id` 字段会被原生代码忽略
+（后者仅引擎侧会话归档语义随之失效）。
