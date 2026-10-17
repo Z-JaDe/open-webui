@@ -49,6 +49,8 @@
 			import AdminDocuments from '$lib/components/admin/Settings/Documents.svelte';
 			import AdminInterface from '$lib/components/admin/Settings/Interface.svelte';
 				import AdminDatabase from '$lib/components/admin/Settings/Database.svelte';
+	// banyan（hook④，V-10 W4）：admin:connections 分支换引擎只读状态卡（BanyanEngineStatus）
+	import AdminBanyanEngineStatus from '$lib/components/admin/BanyanEngineStatus.svelte';
 
 	const i18n: Writable<any> = getContext('i18n');
 
@@ -276,9 +278,11 @@
 		},
 		{
 			id: 'admin:connections',
-			titleKey: 'settings.admin.connections.title',
-			title: $i18n.t('settings.admin.connections.title'),
-			searchPrefixes: ['settings.admin.connections.']
+			// hook④（V-10 W4）：面板已是引擎状态卡，标题改 'Engine'（普通键回退，
+			// 同 admin:apps 'Apps' 的既有写法；tab 行 id 保留不动）
+			titleKey: 'Engine',
+			title: $i18n.t('Engine'),
+			searchPrefixes: []
 		},
 		{
 			id: 'admin:models',
@@ -854,11 +858,8 @@
 			{:else if selectedTab === 'admin:authentication'}
 				<AdminAuthentication />
 			{:else if selectedTab === 'admin:connections'}
-				<AdminConnections
-					on:save={() => {
-						toast.success($i18n.t('Settings saved successfully!'));
-					}}
-				/>
+				<!-- hook④（V-10 W4）：分支换 BanyanEngineStatus 只读状态卡（tab 行保留，不删） -->
+				<AdminBanyanEngineStatus />
 			{:else if selectedTab === 'admin:models'}
 				<AdminModels bind:tabState />
 			{:else if selectedTab === 'admin:subagents'}

@@ -97,7 +97,7 @@ const toRegistryStatus = (raw: any): BanyanRegistryEntry['status'] => {
 };
 
 const request = async (
-	method: 'GET' | 'POST',
+	method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
 	path: string,
 	body?: Record<string, any>
 ): Promise<any> => {
@@ -416,4 +416,249 @@ export const stopBanyanSubagent = async (
 	// RF-Z：引擎真实对端是 /work/{id}/cancel（子代理工单取消）——
 	// 旧 /subagents/{id}/stop 引擎无此路由（死按钮，RV-final 携带 P1）。
 	return request('POST', `/work/${encodeURIComponent(subagentId)}/cancel`);
+};
+
+////////////////////////////
+// 管家信箱 /inbox（v3 W2，V-4/V-5）
+// kind→category 机械映射在引擎侧；三 tab 按 category 过滤，前端不自解释。
+////////////////////////////
+export type BanyanInboxCategory = 'decision' | 'done' | 'notice';
+
+export type BanyanInboxItem = {
+	id: string;
+	/** blocked_escalation|principle_conflict|delivery_signoff|plan_completed|notice */
+	kind: string;
+	category: BanyanInboxCategory;
+	title: string;
+	body: string;
+	push: boolean;
+	/** open|read|resolved|archived|expired */
+	status: string;
+	/** 待裁决项的预设选项（仅展示，提交用 resolve 的 decision） */
+	options: string[];
+	ref_kind?: string;
+	ref_id?: string;
+	plan_id?: string;
+	task_id?: string;
+	conv_id?: string;
+	/** epoch ms（引擎给 epoch 秒，本层换算） */
+	created_at?: number;
+	/** 超时升级旁注（V-5：只 escalated+重复推送，不代决） */
+	escalated?: boolean;
+	/** 引擎裁决流回填（resolved 项展示用） */
+	resolution?: Record<string, any>;
+};
+
+export type BanyanInboxUnread = { decision: number; done: number; notice: number };
+
+export type BanyanInboxSnapshot = { items: BanyanInboxItem[]; unread: BanyanInboxUnread };
+
+export const getBanyanInbox = async (
+	query: { category?: BanyanInboxCategory; status?: string; limit?: number } = {},
+	token: string = localStorage.token
+): Promise<BanyanInboxSnapshot> => {
+	const params = new URLSearchParams();
+	if (query.category) params.set('category', query.category);
+	if (query.status) params.set('status', query.status);
+	params.set('limit', String(query.limit ?? 50));
+	const res = await fetch(`${BANYAN_API_BASE_URL}/inbox?${params.toString()}`, {
+		method: 'GET',
+		headers: { Authorization: `Bearer ${token}` }
+	});
+	if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+	// 引擎 GET /api/inbox 返回 {items:[msg 行], unread:{decision,done,notice}}
+	const raw: any = await res.json();
+	const items = asArray(raw?.items).map((m: any): BanyanInboxItem => ({
+		id: String(m?.id ?? ''),
+		kind: String(m?.kind ?? ''),
+		category: (['decision', 'done', 'notice'].includes(m?.category)
+			? m.category
+			: 'notice') as BanyanInboxCategory,
+		title: String(m?.title ?? m?.id ?? ''),
+		body: String(m?.body ?? ''),
+		push: !!m?.push,
+		status: String(m?.status ?? 'open'),
+		options: asArray(m?.options).map(String),
+		ref_kind: m?.ref_kind ? String(m.ref_kind) : undefined,
+		ref_id: m?.ref_id ? String(m.ref_id) : undefined,
+		plan_id: m?.plan_id ? String(m.plan_id) : undefined,
+		task_id: m?.task_id ? String(m.task_id) : undefined,
+		conv_id: m?.conv_id ? String(m.conv_id) : undefined,
+		created_at: toMs(m?.created_at),
+		escalated: !!m?.escalated,
+		resolution: m?.resolution && typeof m.resolution === 'object' ? m.resolution : undefined
+	}));
+	const unread = raw?.unread ?? {};
+	return {
+		items,
+		unread: {
+			decision: Number(unread?.decision ?? 0),
+			done: Number(unread?.done ?? 0),
+			notice: Number(unread?.notice ?? 0)
+		}
+	};
+};
+
+/** 裁决：decision 自由文本（页面预设 'approve'（批准扩围）/ 'reject'（驳回）） */
+export const resolveBanyanInbox = async (
+	msgId: string,
+	decision: string,
+	note?: string,
+	token: string = localStorage.token
+) => {
+	return request('POST', `/inbox/${encodeURIComponent(msgId)}/resolve`, {
+		decision,
+		...(note ? { note } : {})
+	});
+};
+
+export const readBanyanInbox = async (msgId: string, token: string = localStorage.token) => {
+	return request('POST', `/inbox/${encodeURIComponent(msgId)}/read`);
+};
+
+export const archiveBanyanInbox = async (msgId: string, token: string = localStorage.token) => {
+	return request('POST', `/inbox/${encodeURIComponent(msgId)}/archive`);
+};
+
+////////////////////////////
+// 日历 /calendar（v3 W3，V-8 第一包：UTC 绝对时间戳，无 rrule）
+// 所有 ts 均为 UTC epoch 秒；RRSVP/循环等引擎不支持的字段一律不出。
+////////////////////////////
+export type BanyanCalendarEvent = {
+	id: string;
+	title: string;
+	description?: string;
+	/** UTC epoch 秒 */
+	start_ts: number;
+	/** UTC epoch 秒 */
+	end_ts?: number;
+	all_day: boolean;
+	/** open|cancelled（DELETE/取消语义后为 cancelled） */
+	status: string;
+	source?: string;
+	remind_offset_s?: number;
+};
+
+export const getBanyanCalendar = async (
+	query: { from: number; to: number },
+	token: string = localStorage.token
+): Promise<BanyanCalendarEvent[]> => {
+	const params = new URLSearchParams({
+		from: String(Math.floor(query.from)),
+		to: String(Math.floor(query.to))
+	});
+	const res = await fetch(`${BANYAN_API_BASE_URL}/calendar/events?${params.toString()}`, {
+		method: 'GET',
+		headers: { Authorization: `Bearer ${token}` }
+	});
+	if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+	// 引擎 GET /api/calendar/events 返回 {events:[...]}（UTC epoch 秒）
+	const raw: any = await res.json();
+	return asArray(raw?.events).map((e: any): BanyanCalendarEvent => ({
+		id: String(e?.id ?? ''),
+		title: String(e?.title ?? ''),
+		description: e?.description ? String(e.description) : undefined,
+		start_ts: Number(e?.start_ts ?? 0),
+		end_ts: typeof e?.end_ts === 'number' ? e.end_ts : undefined,
+		all_day: !!e?.all_day,
+		status: String(e?.status ?? 'open'),
+		source: e?.source ? String(e.source) : undefined,
+		remind_offset_s: typeof e?.remind_offset_s === 'number' ? e.remind_offset_s : undefined
+	}));
+};
+
+export const createBanyanCalendarEvent = async (
+	body: {
+		title: string;
+		start_ts: number;
+		end_ts: number;
+		all_day?: boolean;
+		description?: string;
+		remind_offset_s?: number;
+	},
+	token: string = localStorage.token
+) => {
+	// 引擎契约:POST /api/calendar/events → {event:{...}}
+	return request('POST', `/calendar/events`, body);
+};
+
+export const updateBanyanCalendarEvent = async (
+	eventId: string,
+	body: Partial<{
+		title: string;
+		start_ts: number;
+		end_ts: number;
+		all_day: boolean;
+		description: string;
+		remind_offset_s: number | null;
+	}>,
+	token: string = localStorage.token
+) => {
+	return request('PATCH', `/calendar/events/${encodeURIComponent(eventId)}`, body);
+};
+
+/** DELETE = 取消语义（引擎置 cancelled，不物理删） */
+export const deleteBanyanCalendarEvent = async (
+	eventId: string,
+	token: string = localStorage.token
+) => {
+	return request('DELETE', `/calendar/events/${encodeURIComponent(eventId)}`);
+};
+
+////////////////////////////
+// 引擎聚合状态 /status（v3 W4，V-10：sidecar 不可达时 sidecar={ok:false}，不 500）
+////////////////////////////
+export type BanyanEngineStatus = {
+	engine: {
+		status: string;
+		last_seq?: number;
+		paused?: boolean;
+		home?: string;
+		workspace?: string;
+		version?: string;
+	};
+	sidecar: { ok: boolean; roles?: string[] | Record<string, any> };
+	tiers: { id: string; label?: string; desc?: string; model?: string; keyed?: boolean; default?: boolean }[];
+	counts: { inbox: BanyanInboxUnread; plans_running: number };
+};
+
+export const getBanyanStatus = async (token: string = localStorage.token): Promise<BanyanEngineStatus> => {
+	const res = await fetch(`${BANYAN_API_BASE_URL}/status`, {
+		method: 'GET',
+		headers: { Authorization: `Bearer ${token}` }
+	});
+	if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+	const raw: any = await res.json();
+	const engine = raw?.engine ?? {};
+	const unread = raw?.counts?.inbox ?? {};
+	return {
+		engine: {
+			status: String(engine?.status ?? 'unknown'),
+			last_seq: typeof engine?.last_seq === 'number' ? engine.last_seq : undefined,
+			paused: !!engine?.paused,
+			home: engine?.home ? String(engine.home) : undefined,
+			workspace: engine?.workspace ? String(engine.workspace) : undefined,
+			version: engine?.version ? String(engine.version) : undefined
+		},
+		sidecar: {
+			ok: !!raw?.sidecar?.ok,
+			roles: raw?.sidecar?.roles ?? undefined
+		},
+		tiers: asArray(raw?.tiers).map((t: any) => ({
+			id: String(t?.id ?? ''),
+			label: t?.label ? String(t.label) : undefined,
+			desc: t?.desc ? String(t.desc) : undefined,
+			model: t?.model ? String(t.model) : undefined,
+			keyed: !!t?.keyed,
+			default: !!t?.default
+		})),
+		counts: {
+			inbox: {
+				decision: Number(unread?.decision ?? 0),
+				done: Number(unread?.done ?? 0),
+				notice: Number(unread?.notice ?? 0)
+			},
+			plans_running: Number(raw?.counts?.plans_running ?? 0)
+		}
+	};
 };

@@ -24,18 +24,30 @@
   `{#if message?.banyanEvents?.length}<BanyanEvents events={message.banyanEvents} {chatId} />{/if}`
 - 新增 import：`BanyanEvents from '$lib/components/banyan/BanyanEvents.svelte'`。
 
-### 钩点③ — `src/lib/components/layout/Sidebar.svelte`（任务分区五入口）
-- `banyanTaskEntries` 常量（registry/cards/audit/waves/tree 五入口）
+### 钩点③ — `src/lib/components/layout/Sidebar.svelte`（任务分区入口）
+- `banyanTaskEntries` 常量（registry/cards/audit/waves/tree/arch 六入口；
+  v3 W2/W3（V-10）追加 **inbox/cal 两行**）
+- v3 W2 信箱徽标（登记在钩点③内）：`getBanyanInbox` import + 60s 轮询
+  `unread.decision` 的 onMount/清 timer 块 + inbox 条目徽标渲染
+  （任何异常静默置 0，引擎不在是常态）
 - `activeBanyanEntryPrefix` 高亮
 - `SidebarSection id="sidebar-banyan"` 区块（Channels 区块之后、Folders 之前）
 - `showBanyanTasks` 状态。
 
+### hook④ — `src/lib/components/chat/SettingsModal.svelte`（v3 W4，V-10 两处）
+- 组件分支 `admin:connections` → `<AdminBanyanEngineStatus />`（只读状态卡；
+  tab 行保留不删；`AdminConnections` import 留置未用，回滚即还原）
+- `adminSettings` 数组中 `admin:connections` 的 `title/titleKey` 改普通键
+  `'Engine'`（同 `admin:apps` 'Apps' 的既有写法）、`searchPrefixes` 置空
+  （面板内容已换，旧 connections 搜索前缀作废）
+
 其余改动全部在 **新文件** 内：
 | 目录/文件 | 内容 |
 |---|---|
-| `src/lib/components/banyan/` | types（schema）/ mock（story 数据）/ 五组件 + BanyanEvents 聚合器 + BanyanPageNav |
-| `src/lib/apis/banyan/` | 引擎 API 客户端（统一 `/banyan/api/*`） |
-| `src/routes/(app)/(banyan)/` | 五路由 + 共享布局 + waves/tree 入口页 |
+| `src/lib/components/banyan/` | types（schema）/ mock（story 数据）/ 五组件 + BanyanEvents 聚合器 + BanyanPageNav（v3 W2/W3 起含 inbox/cal pills） |
+| `src/lib/apis/banyan/` | 引擎 API 客户端（统一 `/banyan/api/*`；v3 W2-W4 追加 inbox/calendar/status 九函数） |
+| `src/routes/(app)/(banyan)/` | 五路由 + 共享布局 + waves/tree 入口页；v3 W2/W3 追加 `inbox/+page.svelte`（信箱三 tab）与 `cal/+page.svelte`（复用 CalendarView 月视图） |
+| `src/lib/components/admin/BanyanEngineStatus.svelte` | v3 W4：引擎聚合状态只读卡（hook④ 的面板本体） |
 | `backend/open_webui/routers/banyan.py` | 代理桥（`/banyan/api/*` → 引擎） |
 | `backend/open_webui/main.py` | 仅一行 import + 一行 include_router（钩点③的 backend 侧，登记在案） |
 | `backend/open_webui/routers/openai.py` | 三处：流式转发包 `banyan_passthrough_wrapper` + 非流式 `strip_banyan_sse_lines`（§2 透传链路）+ conv 头注入（§3b，均在 `generate_chat_completion` 内，登记在案） |
@@ -125,7 +137,11 @@ history），历史载入时在钩点①恢复。事件正本仍在引擎 K1，c
 `/plans/{id}/resolve`、`/chats/{id}/tree`、`/work/{id}/cancel`
 （RF-Z：子代理停止的真实引擎对端；旧 `/subagents/{id}/stop` 引擎无此路由已弃，
 `/chats/{id}/tree/switch`、`/chats/{id}/tree/rerun` 仅消息流 TreeSwitcher/story
-面在调用、引擎侧暂无对端）。
+面在调用、引擎侧暂无对端）。v3（W2-W4，V-4/V-5/V-8/V-10）追加：
+`/inbox?category=&status=&limit=`、`/inbox/{id}/read|archive|resolve`、
+`/calendar/events?from=&to=`（epoch 秒）、`POST/PATCH/DELETE /calendar/events[/{id}]`
+（DELETE=取消语义）、`/status`（引擎+sidecar 聚合健康；sidecar 不可达返回
+`{ok:false}` 不 500）。
 路径穿越防护：`/banyan/api/*` 转发前经 `utils/banyan_bridge.safe_bridge_path`
 校验，解码后含 `..` 段/反斜杠一律 400 不转发（P2-f-1）。
 
@@ -248,8 +264,8 @@ env 覆盖生效）。
 无法真连引擎时：
 - 组件级：`<PlanCard mock />` 等五组件均支持 `mock` prop，渲染
   `src/lib/components/banyan/mock.ts` 内置样例。
-- 路由级：五路由 URL 加 `?mock=1`，走内置样例数据，不请求引擎；
-  引擎不可达时页面顶部展示明确错误条（不静默伪造）。
+- 路由级：各 (banyan) 路由 URL 加 `?mock=1`（v3 起含 inbox/cal），走内置样例数据，
+  不请求引擎；引擎不可达时页面顶部展示明确错误条（不静默伪造）。
 
 ---
 

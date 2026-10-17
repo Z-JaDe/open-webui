@@ -130,15 +130,43 @@
 	let showChatsMenu = false;
 	let showBanyanTasks = true;
 
-	// banyan 任务分区入口（钩点③；WE-7 起含 /arch 架构页）
+	// banyan 任务分区入口（钩点③；WE-7 起含 /arch 架构页；v3 W2/W3 追加 inbox/cal 两行）
+	// v3 W2 信箱徽标数据源（import 与徽标逻辑一并登记在钩点③内）
+	import { getBanyanInbox } from '$lib/apis/banyan';
+
 	const banyanTaskEntries = [
 		{ id: 'registry', label: 'Registry', href: '/registry', prefix: '/registry' },
 		{ id: 'cards', label: 'Cards', href: '/cards', prefix: '/cards' },
 		{ id: 'audit', label: 'Audit', href: '/audit', prefix: '/audit' },
 		{ id: 'waves', label: 'Waves', href: '/waves', prefix: '/waves' },
 		{ id: 'tree', label: 'Tree', href: '/tree', prefix: '/tree' },
-		{ id: 'arch', label: 'Arch', href: '/arch', prefix: '/arch' }
+		{ id: 'arch', label: 'Arch', href: '/arch', prefix: '/arch' },
+		{ id: 'inbox', label: 'Inbox', href: '/inbox', prefix: '/inbox' },
+		{ id: 'cal', label: 'Calendar', href: '/cal', prefix: '/cal' }
 	];
+
+	// v3 W2（V-10）：信箱条目挂待裁决数徽标——60s 轮询 decision 未读数，
+	// 任何异常静默置 0（引擎不在是常态）；组件销毁清 timer。
+	let banyanInboxPending = 0;
+	let banyanInboxTimer: ReturnType<typeof setInterval> | null = null;
+	const refreshBanyanInboxPending = async () => {
+		try {
+			const snapshot = await getBanyanInbox({ status: 'open', category: 'decision', limit: 1 });
+			banyanInboxPending = snapshot.unread?.decision ?? 0;
+		} catch {
+			banyanInboxPending = 0;
+		}
+	};
+	onMount(() => {
+		refreshBanyanInboxPending();
+		banyanInboxTimer = setInterval(refreshBanyanInboxPending, 60 * 1000);
+		return () => {
+			if (banyanInboxTimer) {
+				clearInterval(banyanInboxTimer);
+				banyanInboxTimer = null;
+			}
+		};
+	});
 
 	$: activeBanyanEntryPrefix = banyanTaskEntries.find(
 		(entry) => $page.url.pathname === entry.prefix || $page.url.pathname.startsWith(`${entry.prefix}/`)
@@ -1409,6 +1437,14 @@
 										{$i18n.t(entry.label)}
 									</div>
 								</div>
+								<!-- v3 W2（V-10）：信箱条目待裁决徽标 -->
+								{#if entry.id === 'inbox' && banyanInboxPending > 0}
+									<span
+										class="ml-auto self-center inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full text-[10px] font-semibold bg-blue-500 text-white"
+									>
+										{banyanInboxPending}
+									</span>
+								{/if}
 							</a>
 						{/each}
 					</SidebarSection>

@@ -1,5 +1,5 @@
 <!--
-	banyan 任务工作台导航 pills（钩点③）：registry / cards / audit 三列表页共用；
+	banyan 任务工作台导航 pills（钩点③）：registry / cards / audit / inbox / cal 列表页共用；
 	waves/tree 为详情页，由各自入口进入。
 -->
 <script lang="ts">
@@ -13,7 +13,9 @@
 	export let tabs = [
 		{ id: 'registry', label: 'Registry', href: '/registry' },
 		{ id: 'cards', label: 'Cards', href: '/cards' },
-		{ id: 'audit', label: 'Audit', href: '/audit' }
+		{ id: 'audit', label: 'Audit', href: '/audit' },
+		{ id: 'inbox', label: 'Inbox', href: '/inbox' },
+		{ id: 'cal', label: 'Calendar', href: '/cal' }
 	];
 
 	$: active = $page.url.pathname;
