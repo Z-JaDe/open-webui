@@ -40,9 +40,10 @@
 		{ id: 'notice', label: 'Notices' }
 	];
 
-	// 各 tab 拉取的状态集（引擎 status 默认 open；done/notice 需含已读与已裁决项）
+	// 各 tab 拉取的状态集(引擎 status 逗号多值逐个拉取;done/notice 需含已读与已裁决项;
+	// F2/D3:decision 并拉 resolved——处置不是消失,是换视图,"已处置"组在本页可查)
 	const TAB_STATUSES: Record<BanyanInboxCategory, string[]> = {
-		decision: ['open'],
+		decision: ['open', 'read', 'resolved'],
 		done: ['open', 'read', 'resolved'],
 		notice: ['open', 'read']
 	};
@@ -97,8 +98,30 @@
 			status: 'open',
 			options: [],
 			created_at: Date.now() - 1000 * 60
+		},
+		{
+			id: 'msg_mock0005',
+			kind: 'blocked_escalation',
+			category: 'decision',
+			title: '攻击门拦截：高危方案（已豁免）',
+			body: '攻击面板拦下整契约重跑方案；人已批准豁免重跑，本卡转入已处置可查。',
+			push: true,
+			status: 'resolved',
+			options: [],
+			resolution: { decision: 'approve', by: 'human', ts: Date.now() - 1000 * 100 },
+			plan_id: 'plan-mock-001',
+			created_at: Date.now() - 1000 * 900
 		}
 	];
+
+	// F2/D3:decision tab 分两组渲染——待处置(open/read,可批准/驳回)在上、
+	// 已处置(resolved,只读+resolution 摘要+归档)在下;done/notice tab 不分组。
+	$: pendingItems =
+		activeTab === 'decision'
+			? items.filter((i) => i.status === 'open' || i.status === 'read')
+			: items;
+	$: resolvedItems =
+		activeTab === 'decision' ? items.filter((i) => i.status === 'resolved') : [];
 
 	const load = async () => {
 		error = null;
@@ -237,8 +260,14 @@
 		{/each}
 	</div>
 
+	<!-- F2/D3:decision tab 两组(待处置在上/已处置在下);done/notice 单列表不变 -->
 	<div class="space-y-2">
-		{#each items as item (item.id)}
+		{#if activeTab === 'decision' && pendingItems.length}
+			<div class="text-xs font-semibold text-gray-500 dark:text-gray-400">
+				{$i18n.t('Pending')} · {pendingItems.length}
+			</div>
+		{/if}
+		{#each pendingItems as item (item.id)}
 			<div
 				class="rounded-xl border border-gray-100 dark:border-gray-850 bg-gray-50 dark:bg-gray-900/40 p-3 space-y-2"
 			>
@@ -295,8 +324,8 @@
 							.filter(Boolean)
 							.join(' · ')}
 					</div>
-					<div class="flex items-center gap-2">
-						{#if item.category === 'decision' && item.status === 'open'}
+						<div class="flex items-center gap-2">
+							{#if item.category === 'decision' && (item.status === 'open' || item.status === 'read')}
 							<button
 								type="button"
 								class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200 disabled:opacity-50 transition"
@@ -340,9 +369,78 @@
 				</div>
 			</div>
 		{:else}
-			<div class="text-xs text-gray-400 dark:text-gray-500">
-				{loaded ? $i18n.t('Nothing here') : `${$i18n.t('Loading')}…`}
-			</div>
+			{#if !(activeTab === 'decision' && resolvedItems.length)}
+				<div class="text-xs text-gray-400 dark:text-gray-500">
+					{loaded ? $i18n.t('Nothing here') : `${$i18n.t('Loading')}…`}
+				</div>
+			{/if}
 		{/each}
+
+		<!-- 已处置组(F2/D3):resolved 不再消失——只读+resolution 摘要+归档 -->
+		{#if activeTab === 'decision' && resolvedItems.length}
+			<div class="pt-3 text-xs font-semibold text-gray-500 dark:text-gray-400">
+				{$i18n.t('Resolved')} · {resolvedItems.length}
+			</div>
+			{#each resolvedItems as item (item.id)}
+				<div
+					class="rounded-xl border border-gray-100 dark:border-gray-850 bg-gray-50/60 dark:bg-gray-900/30 p-3 space-y-2"
+				>
+					<div class="flex items-start justify-between gap-2">
+						<div class="flex items-center gap-2 flex-wrap min-w-0">
+							<span
+								class="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400"
+							>
+								{$i18n.t(KIND_LABELS[item.kind] ?? item.kind)}
+							</span>
+							<span
+								class="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-500/10 text-green-600 dark:text-green-400"
+							>
+								{$i18n.t('Resolved')}
+							</span>
+							<div class="text-sm font-medium text-gray-600 dark:text-gray-300 truncate">
+								{item.title}
+							</div>
+						</div>
+						<span class="shrink-0 text-[11px] text-gray-400">{fmtTime(item.created_at)}</span>
+					</div>
+
+					{#if item.body}
+						<div
+							class="text-xs text-gray-500 dark:text-gray-400 leading-relaxed whitespace-pre-wrap"
+						>
+							{item.body}
+						</div>
+					{/if}
+
+					{#if item.resolution}
+						<div
+							class="text-[11px] text-gray-500 dark:text-gray-400 rounded-lg bg-black/[0.03] dark:bg-white/[0.04] px-2 py-1.5"
+						>
+							{$i18n.t('Decision')}: {item.resolution.decision ?? '—'}{item.resolution.note
+								? ` · ${item.resolution.note}`
+								: ''}
+						</div>
+					{/if}
+
+					<div class="flex items-center justify-between gap-2 flex-wrap">
+						<div class="text-[11px] text-gray-400 dark:text-gray-500 truncate">
+							{[item.ref_kind ? `${item.ref_kind}:${item.ref_id}` : '', item.plan_id, item.task_id]
+								.filter(Boolean)
+								.join(' · ')}
+						</div>
+						{#if item.status !== 'archived'}
+							<button
+								type="button"
+								class="px-3 py-1.5 text-xs rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 transition"
+								disabled={actingId === item.id}
+								on:click={() => archive(item)}
+							>
+								{$i18n.t('Archive')}
+							</button>
+						{/if}
+					</div>
+				</div>
+			{/each}
+		{/if}
 	</div>
 </div>

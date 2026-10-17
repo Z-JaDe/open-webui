@@ -196,6 +196,11 @@ ENABLE_ADMIN_ANALYTICS=false
 其余（DB `config` 表热生效的开关、i18n、任务后台收敛等）按审计 §11a 的 SQL
 清单写库即可，无需重启。当前运行实例启动脚本：`/tmp/run-webui.sh`。
 
+**任务面模型（F3/D5）**：管理设置 `task.model.external` 建议填 `banyan-fast`——
+标题/标签/补全等后台任务自动轮烧引擎 fast 档，且走引擎无状态通道
+（引擎按 `X-Banyan-Task: 1` 识别：不建会话、不写 chat.db 行、不占 duty LRU，
+任务轮不再污染人的会话历史）。
+
 **RAG 嵌入本地化**（审计域3）：
 - 选型 `BAAI/bge-small-zh-v1.5`（中文优先，512 维）；DB 键
   `rag.embedding_engine=""`（**空串=本地 sentence-transformers**，不是

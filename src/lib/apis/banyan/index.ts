@@ -361,6 +361,49 @@ export const resolveBanyanPlan = async (
 };
 
 ////////////////////////////
+// 方案列表 /plans(F1/D2 方案列表页:状态分组一屏全览,点入下钻)
+////////////////////////////
+export type BanyanPlanListItem = {
+	id: string;
+	/** open|pending_approval|running|blocked|finished|rejected|revised|orphaned */
+	status: string;
+	/** 联 orch_problems.subject(无 problem 的方案为空串,渲染回退 id) */
+	subject: string;
+	/** epoch ms(引擎给 epoch 秒,本层换算) */
+	created_at?: number;
+	tasks: { total: number; done: number; failed: number; skipped: number };
+};
+
+export const getBanyanPlans = async (
+	query: { status?: string; limit?: number } = {},
+	token: string = localStorage.token
+): Promise<BanyanPlanListItem[]> => {
+	const params = new URLSearchParams();
+	if (query.status) params.set('status', query.status); // 逗号多值(V-15 惯例),空=全部
+	params.set('limit', String(query.limit ?? 50));
+	const res = await fetch(`${BANYAN_API_BASE_URL}/plans?${params.toString()}`, {
+		method: 'GET',
+		headers: { Authorization: `Bearer ${token}` }
+	});
+	if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+	// 引擎 GET /api/plans 返回
+	// {plans:[{id,status,subject,created_at(epoch 秒),tasks:{total,done,failed,skipped}}]}
+	const raw: any = await res.json();
+	return asArray(raw?.plans).map((p: any): BanyanPlanListItem => ({
+		id: String(p?.id ?? ''),
+		status: String(p?.status ?? ''),
+		subject: String(p?.subject ?? ''),
+		created_at: toMs(p?.created_at),
+		tasks: {
+			total: Number(p?.tasks?.total ?? 0),
+			done: Number(p?.tasks?.done ?? 0),
+			failed: Number(p?.tasks?.failed ?? 0),
+			skipped: Number(p?.tasks?.skipped ?? 0)
+		}
+	}));
+};
+
+////////////////////////////
 // 会话树 /tree
 ////////////////////////////
 export const getBanyanTree = async (chatId: string, token: string = localStorage.token): Promise<BanyanTreeSnapshot> => {
