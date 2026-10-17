@@ -1,5 +1,8 @@
+import json
 import logging
+import time
 from typing import Optional
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.concurrency import run_in_threadpool
@@ -22,7 +25,9 @@ from open_webui.models.feedbacks import (
 )
 from open_webui.models.users import UserModel, Users
 from open_webui.utils.auth import get_admin_user, get_verified_user
+from open_webui.utils.banyan_chat_adapter import is_engine_chat
 from pydantic import BaseModel
+import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 log = logging.getLogger(__name__)
@@ -422,6 +427,90 @@ async def get_feedbacks(
     return result
 
 
+############################
+# D22 评分桥:引擎会话(sess_*)的人评 → 引擎 /api/feedback(K2 降权输入)。
+# 信号不沉 fork 库:fork feedback 表禁用(D22),桥接路径零写入、可重试;
+# 非 sess_ 存量会话返回 None 走原路径零改;snapshot.chat(竞技场快照)不桥接。
+############################
+
+_ENGINE_TIMEOUT = 10.0
+
+
+def _engine_base_url() -> str:
+    return os.environ.get('BANYAN_ENGINE_URL', 'http://localhost:8420').rstrip('/')
+
+
+def _engine_headers() -> dict:
+    headers = {'Accept': 'application/json'}
+    token = os.environ.get('BANYAN_TOKEN', '').strip()
+    if token:
+        headers['Authorization'] = f'Bearer {token}'
+    return headers
+
+
+def _details_summary(value) -> Optional[str]:
+    """data.details(形状任意)→ 200 字摘要,作 reason 兜底。"""
+    if value is None:
+        return None
+    text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, default=str)
+    return text[:200] or None
+
+
+async def _bridge_feedback(form_data: FeedbackForm, user) -> Optional[FeedbackModel]:
+    """引擎会话评分桥;返回 None = 不桥接(存量会话/snapshot,走原 fork 路径)。
+
+    - POST 引擎 /api/feedback {conv_id, turn_id?, message_row_id?, rating, reason?};
+    - 成功 → 合成 FeedbackModel(id='fbx-<hex>')回显,不落 fork 表;
+    - 引擎不可达/5xx → 502(不沉库,前端可重试);引擎 4xx 原码透传(未知 conv=404)。
+    """
+    if form_data.snapshot is not None and form_data.snapshot.chat:
+        return None  # 竞技场快照评分不属任何引擎会话
+    meta = form_data.meta or {}
+    chat_id = meta.get('chat_id')
+    if not is_engine_chat(chat_id):
+        return None
+
+    data = form_data.data
+    body: dict = {
+        'conv_id': chat_id,
+        'message_row_id': meta.get('message_id'),
+        'rating': data.rating if data else None,
+    }
+    if meta.get('turn_id'):
+        body['turn_id'] = meta.get('turn_id')
+    reason = (data.reason if data else None) or _details_summary(getattr(data, 'details', None) if data else None)
+    if reason:
+        body['reason'] = reason
+
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(_ENGINE_TIMEOUT)) as client:
+            resp = await client.post(f'{_engine_base_url()}/api/feedback', headers=_engine_headers(), json=body)
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f'banyan engine unreachable: {e}')
+    if resp.status_code >= 500:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f'banyan engine error {resp.status_code}: {resp.text[:200]}')
+    if resp.status_code >= 400:
+        try:
+            detail = resp.json().get('detail') or resp.text[:200]
+        except Exception:
+            detail = resp.text[:200]
+        raise HTTPException(status_code=resp.status_code, detail=detail)
+
+    log.info('Feedback bridged to engine (conv=%s, rating=%s)', chat_id, body['rating'])
+    now = int(time.time())
+    return FeedbackModel(
+        id=f'fbx-{uuid4().hex[:12]}',
+        user_id=user.id,
+        version=0,
+        type=form_data.type,
+        data=form_data.data.model_dump(exclude_none=True) if form_data.data else None,
+        meta=form_data.meta,
+        snapshot=None,  # 快照留 fork 形状之外:引擎才是正本,D22 零双写
+        created_at=now,
+        updated_at=now,
+    )
+
+
 @router.post('/feedback', response_model=FeedbackModel)
 async def create_feedback(
     request: Request,
@@ -429,6 +518,10 @@ async def create_feedback(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    bridged = await _bridge_feedback(form_data, user)
+    if bridged is not None:
+        return bridged
+
     feedback = await Feedbacks.insert_new_feedback(user_id=user.id, form_data=form_data, db=db)
     if not feedback:
         raise HTTPException(
@@ -467,6 +560,11 @@ async def update_feedback_by_id(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    # 引擎会话评分的"更新"同样走桥(引擎按 conv/message 幂等落账;fork 无该行可更新)
+    bridged = await _bridge_feedback(form_data, user)
+    if bridged is not None:
+        return bridged
+
     if user.role == 'admin':
         feedback = await Feedbacks.update_feedback_by_id(id=id, form_data=form_data, db=db)
     else:

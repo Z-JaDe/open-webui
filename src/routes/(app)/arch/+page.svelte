@@ -8,6 +8,7 @@
 
 	import Markdown from '$lib/components/chat/Messages/Markdown.svelte';
 	import BanyanEngineStatus from '$lib/components/admin/BanyanEngineStatus.svelte';
+	import PiSessions from '$lib/components/banyan/PiSessions.svelte';
 	import { getBanyanStatus } from '$lib/apis/banyan';
 
 	// @ts-ignore md raw import has no local typings in this repo
@@ -81,6 +82,17 @@
 					<Markdown content={architectureMd} id="banyan-architecture" />
 				</div>
 			{/if}
+
+			<!-- F15/D28:sidecar Pi 会话(手工/休眠会话可见性,只读) -->
+			<div
+				class="rounded-xl border border-gray-100 dark:border-gray-850 p-4 mt-6 text-xs"
+				data-testid="banyan-pi-sessions"
+			>
+				<div class="text-sm font-medium text-black dark:text-white mb-3">
+					{$i18n.t('Pi sessions (sidecar, read-only)')}
+				</div>
+				<PiSessions />
+			</div>
 		</div>
 	</div>
 </div>
