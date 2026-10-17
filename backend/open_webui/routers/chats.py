@@ -833,7 +833,14 @@ async def delete_all_user_chats(
 
     tag_ids = [tag.id for tag in await Tags.get_tags_by_user_id(user.id, db=db)]
     result = await Chats.delete_chats_by_user_id(user.id, db=db)
-    if result:
+    # banyan D16'：引擎会话无行可删——全删同构为全归档（置态留史，对齐单删除
+    # 语义 delete=archived=true），归档列表照常可见可还原。
+    try:
+        engine_archived = await banyan_chat_adapter.bulk_set_archived(True)
+    except Exception as e:
+        log.warning('banyan chats: 引擎批量置档不可得: %s', e)
+        engine_archived = 0
+    if result or engine_archived:
         await Chats.delete_orphan_tags_for_user(tag_ids, user.id, db=db)
         await publish_event(
             request,
@@ -842,7 +849,7 @@ async def delete_all_user_chats(
             subject_id=user.id,
             subject_type='user',
         )
-    return result
+    return result or engine_archived > 0
 
 
 ############################
@@ -1038,6 +1045,24 @@ async def search_user_chats(
             if await Tags.get_tag_by_name_and_user_id(tag_id, user.id, db=db):
                 log.debug('deleting tag: %s', tag_id)
                 await Tags.delete_tag_by_name_and_user_id(tag_id, user.id, db=db)
+
+    # banyan D16'：引擎会话标题并入搜索（引擎 q 下推标题 LIKE，archived 两侧都查；
+    # snippet 仅本地内容搜索有，引擎项为 None）。id 域不相交（sess_* vs 本地 uuid）
+    # 无需去重，统一 updated_at DESC 后按页切片。
+    try:
+        engine_summaries = [
+            *(await banyan_chat_adapter.list_chats(q=text, limit=limit)),
+            *(await banyan_chat_adapter.list_chats(q=text, limit=limit, archived=True)),
+        ]
+        engine_items = await engine_chat_list_items(request, engine_summaries)
+    except Exception as e:
+        log.warning('banyan chats: 引擎会话搜索不可得: %s', e)
+        engine_items = []
+
+    chat_list = sorted(
+        [*chat_list, *engine_items], key=lambda c: c.updated_at or 0, reverse=True
+    )
+    chat_list = chat_list[skip : skip + limit]
 
     return await add_active_state_to_chat_list(request, chat_list)
 
@@ -1261,9 +1286,15 @@ async def archive_all_chats(
     request: Request, user=Depends(get_verified_user), db: AsyncSession = Depends(get_async_session)
 ):
     result = await Chats.archive_all_chats_by_user_id(user.id, db=db)
-    if result:
+    # banyan D16'：引擎会话半边——未归档会话逐个 archived=true（与删除同构置态）。
+    try:
+        engine_count = await banyan_chat_adapter.bulk_set_archived(True)
+    except Exception as e:
+        log.warning('banyan chats: 引擎批量归档不可得: %s', e)
+        engine_count = 0
+    if result or engine_count:
         await publish_event(request, EVENTS.CHAT_ARCHIVED, actor=user, subject_id=user.id, subject_type='user')
-    return result
+    return result or engine_count > 0
 
 
 ############################
@@ -1281,10 +1312,16 @@ async def unarchive_all_chats(
         for tag_id in chat.meta.get('tags', [])
     }
     result = await Chats.unarchive_all_chats_by_user_id(user.id, db=db)
-    if result:
+    # banyan D16'：引擎会话半边——归档会话（删除置态留史的）批量还原。
+    try:
+        engine_count = await banyan_chat_adapter.bulk_set_archived(False)
+    except Exception as e:
+        log.warning('banyan chats: 引擎批量取消归档不可得: %s', e)
+        engine_count = 0
+    if result or engine_count:
         await Tags.ensure_tags_exist(list(tag_ids), user.id, db=db)
         await publish_event(request, EVENTS.CHAT_UNARCHIVED, actor=user, subject_id=user.id, subject_type='user')
-    return result
+    return result or engine_count > 0
 
 
 ############################

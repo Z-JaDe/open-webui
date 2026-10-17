@@ -185,6 +185,7 @@ from open_webui.routers import (
     users,
     utils,
 )
+from open_webui.routers.tasks import generate_title
 from open_webui.routers.retrieval import (
     get_ef,
     get_embedding_function,
@@ -257,7 +258,12 @@ from open_webui.utils.middleware import (
     process_chat_response,
     publish_chat_failed_event,
 )
-from open_webui.utils.misc import get_response_error_detail, merge_model_params
+from open_webui.utils.misc import (
+    get_last_user_message,
+    get_response_error_detail,
+    merge_model_params,
+)
+from open_webui.utils.skills import replace_skill_mentions_with_labels
 from open_webui.utils.model_ids import strip_provider_model_prefix
 from open_webui.utils.models import (
     check_model_access,
@@ -1144,6 +1150,36 @@ async def _set_direct_model(request: Request, model_item: dict, user) -> None:
     request.state.model = model_item
 
 
+def _engine_title_from_task_response(res, messages: list) -> str:
+    """F13 标题回写（sess_ chat）：从标题任务轮响应提取题目——解析逻辑与
+    middleware.background_tasks_handler 同形（{...} JSON 提取 → 失败回退首条
+    用户消息去技能标记，截 100 字）。空串表示本轮无题可写。"""
+    title = ''
+    user_message = get_last_user_message(messages) or ''
+    if len(user_message) > 100:
+        user_message = user_message[:100] + '...'
+
+    if isinstance(res, dict) and len(res.get('choices', [])) == 1:
+        response_message = res['choices'][0].get('message', {})
+        title_string = (
+            response_message.get('content')
+            or response_message.get('reasoning_content')
+            or user_message
+        )
+        title_string = title_string[title_string.find('{') : title_string.rfind('}') + 1]
+        try:
+            title = JSONCodec.loads(title_string).get('title', user_message)
+        except Exception:
+            title = ''
+
+    if not title:
+        first = next((m for m in messages if m.get('role') == 'user'), None)
+        title = replace_skill_mentions_with_labels(
+            (first or {}).get('content', user_message) or user_message
+        )
+    return str(title or '').strip()
+
+
 @app.post('/api/chat/completions')
 @app.post('/api/v1/chat/completions')  # Experimental: Compatibility with OpenAI API
 async def chat_completion(
@@ -1427,9 +1463,38 @@ async def chat_completion(
                 if chat_id.startswith('sess_'):
                     # banyan D16'（零双写）：引擎会话在 WebUI 库零存储——
                     # userInput/assistantText/编排行的正本是引擎 chat.db（转发轮
-                    # 经 X-Banyan-Conv 由引擎落行），完成流不落库、不建标题任务
-                    # （标题由引擎首条消息逻辑生成）；事件经 socket 照常推送前端。
-                    pass
+                    # 经 X-Banyan-Conv 由引擎落行），完成流不落库；事件经 socket
+                    # 照常推送前端。F13 标题回写半边：首条消息的标题任务轮照常
+                    # 发起，产出经适配器回写引擎会话 title（仅当引擎尚无标题——
+                    # 引擎首条消息 50 字截断已先行定题则不覆盖，custom 永不覆盖）。
+                    if initial_title_generation is not None:
+                        first_assistant_message_id = next(
+                            (entry.get('message_id') for entry in message_ids if entry.get('message_id')),
+                            None,
+                        )
+                        title_metadata = {**metadata, 'message_id': first_assistant_message_id}
+                        title_event_emitter = (
+                            await get_event_emitter(title_metadata, update_db=False)
+                            if first_assistant_message_id
+                            else None  # API 直调无前端消息 id:只回写引擎,不做 socket 提示
+                        )
+                        title_messages = form_data.get('messages') or []
+
+                        async def run_engine_title_write_back():
+                            try:
+                                res = await generate_title(
+                                    request,
+                                    {'model': model_id, 'messages': title_messages, 'chat_id': chat_id},
+                                    user,
+                                )
+                                title = _engine_title_from_task_response(res, title_messages)
+                                if title and await banyan_chat_adapter.write_back_title(chat_id, title):
+                                    if title_event_emitter is not None:
+                                        await title_event_emitter({'type': 'chat:title', 'data': title})
+                            except Exception:
+                                log.exception('Error writing back engine chat title')
+
+                        asyncio.create_task(run_engine_title_write_back())
                 elif is_new_chat:
                     # The chat created below is persisted with this folder_id.
                     folder_id = metadata['folder_id']

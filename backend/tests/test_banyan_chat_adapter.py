@@ -404,6 +404,105 @@ def test_list_chats_pages_via_keyset_fetch_and_slice(monkeypatch):
     assert [i['id'] for i in page2] == ['sess_05', 'sess_04', 'sess_03', 'sess_02']
 
 
+def test_list_chats_pushes_q_title_search_down(monkeypatch):
+    monkeypatch.setenv('BANYAN_ENGINE_URL', ENGINE)
+    seen: list[str] = []
+
+    async def sessions(path, kwargs):
+        seen.append(path)
+        return _Resp(200, [{'id': 'sess_q1', 'title': '排查X', 'created_at': 1.0,
+                            'updated_at': 5.0, 'pinned': False, 'archived': False}])
+
+    _install_engine(monkeypatch, ba, [
+        ('GET', '/api/projects', _Resp(200, [{'key': '/w', 'sort_order': 0}])),
+        ('GET', '/api/projects/%2Fw/sessions', sessions),
+    ])
+    items = _run(ba.list_chats(q='排查', limit=20))
+    assert [i['id'] for i in items] == ['sess_q1']
+    assert any('q=%E6%8E%92%E6%9F%A5' in p for p in seen)  # q 经 URL 编码下推引擎
+
+
+# ── F13 标题回写(sess_ 任务轮 → 引擎 PATCH title,保守裁决)──
+
+
+def _title_meta(**kw):
+    meta = {'id': 'sess_abc', 'title': '', 'title_source': 'first_message',
+            'created_at': 1.0, 'updated_at': 2.0, 'pinned': False, 'archived': False}
+    meta.update(kw)
+    return meta
+
+
+def test_write_back_title_patches_when_engine_title_empty(monkeypatch):
+    monkeypatch.setenv('BANYAN_ENGINE_URL', ENGINE)
+    calls = _install_engine(monkeypatch, ba, [
+        ('GET', '/api/sessions/sess_abc', _Resp(200, {'meta': _title_meta(), 'rows': [], 'total': 0})),
+        ('PATCH', '/api/sessions/sess_abc', _Resp(200, {'ok': True})),
+    ])
+    assert _run(ba.write_back_title('sess_abc', '  排查X并修复 ')) is True
+    assert ('PATCH', '/api/sessions/sess_abc', {'title': '排查X并修复'}) in calls  # 去首尾空白
+
+
+def test_write_back_title_never_overwrites_existing_title(monkeypatch):
+    """引擎首条消息 50 字截断已先行定题 → 任务轮题目不覆盖(F13 保守裁决)。"""
+    monkeypatch.setenv('BANYAN_ENGINE_URL', ENGINE)
+    calls = _install_engine(monkeypatch, ba, [
+        ('GET', '/api/sessions/sess_abc',
+         _Resp(200, {'meta': _title_meta(title='帮我排查X并修复'), 'rows': [], 'total': 0})),
+        ('PATCH', '/api/sessions/sess_abc', _Resp(200, {'ok': True})),
+    ])
+    assert _run(ba.write_back_title('sess_abc', '任务轮题目')) is False
+    assert all(m != 'PATCH' for m, _p, _j in calls)  # 零 PATCH
+
+
+def test_write_back_title_never_overwrites_custom_source(monkeypatch):
+    """title_source=custom(人改名)→ 永不覆盖,即使 title 恰为空。"""
+    monkeypatch.setenv('BANYAN_ENGINE_URL', ENGINE)
+    calls = _install_engine(monkeypatch, ba, [
+        ('GET', '/api/sessions/sess_abc',
+         _Resp(200, {'meta': _title_meta(title='', title_source='custom'), 'rows': [], 'total': 0})),
+    ])
+    assert _run(ba.write_back_title('sess_abc', '任务轮题目')) is False
+    assert all(m != 'PATCH' for m, _p, _j in calls)
+
+
+def test_write_back_title_skips_empty_and_engine_down(monkeypatch):
+    monkeypatch.setenv('BANYAN_ENGINE_URL', ENGINE)
+    calls = _install_engine(monkeypatch, ba, [])
+    assert _run(ba.write_back_title('sess_abc', '   ')) is False  # 空题不发起任何调用
+    assert calls == []
+
+    async def _dead(method, path, **kwargs):
+        raise ConnectionError('engine down')
+
+    monkeypatch.setattr(ba, '_engine_call', _dead)
+    assert _run(ba.write_back_title('sess_abc', '排查X')) is False  # 引擎不可达降级 False
+
+
+# ── 批量置态(archive/all、unarchive/all、delete-all 的引擎半边)──
+
+
+def test_bulk_set_archived_patches_matching_side(monkeypatch):
+    monkeypatch.setenv('BANYAN_ENGINE_URL', ENGINE)
+    patches: list[dict | None] = []
+
+    async def patch(path, kwargs):
+        patches.append(kwargs.get('json'))
+        return _Resp(200, {'ok': True})
+
+    _install_engine(monkeypatch, ba, [
+        ('GET', '/api/projects', _Resp(200, [{'key': '/w', 'sort_order': 0}])),
+        ('GET', '/api/projects/%2Fw/sessions', _Resp(200, [
+            {'id': 'sess_1', 'title': 'a', 'created_at': 1.0, 'updated_at': 3.0,
+             'pinned': False, 'archived': False},
+            {'id': 'sess_2', 'title': 'b', 'created_at': 2.0, 'updated_at': 2.0,
+             'pinned': False, 'archived': False},
+        ])),
+        ('PATCH', '/api/sessions/sess_', patch),
+    ])
+    assert _run(ba.bulk_set_archived(True)) == 2  # 归档动作拉未归档侧,逐个置 archived=true
+    assert patches == [{'archived': True}, {'archived': True}]
+
+
 # ── resolve_conv_header(banyan_conv)sess_ 快路径 ─
 
 
