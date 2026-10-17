@@ -544,8 +544,8 @@ export const getBanyanCalendar = async (
 	token: string = localStorage.token
 ): Promise<BanyanCalendarEvent[]> => {
 	const params = new URLSearchParams({
-		from: String(Math.floor(query.from)),
-		to: String(Math.floor(query.to))
+		from_ts: String(Math.floor(query.from)),
+		to_ts: String(Math.floor(query.to))
 	});
 	const res = await fetch(`${BANYAN_API_BASE_URL}/calendar/events?${params.toString()}`, {
 		method: 'GET',
