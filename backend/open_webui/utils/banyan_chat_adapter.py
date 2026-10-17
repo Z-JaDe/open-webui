@@ -250,6 +250,15 @@ def rows_to_chat_messages(rows: list[dict], *, model_id: str = DEFAULT_MODEL_ID)
             if event is not None:
                 _attach(event, ts)
         # 其余 kind(未来引擎扩展):行是超集,跳过不炸
+
+    # 补齐 childrenIds 链(线性树):loadChat 直接消费 chat.history(不走
+    # convertMessagesToHistory),父节点的 childrenIds 需投影侧自建——
+    # 首条 parentId=null,其余父恰一子。
+    by_id = {m['id']: m for m in messages}
+    for m in messages:
+        parent = by_id.get(m.get('parentId'))
+        if parent is not None:
+            parent['childrenIds'].append(m['id'])
     return messages
 
 

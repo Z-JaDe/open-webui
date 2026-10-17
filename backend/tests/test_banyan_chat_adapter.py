@@ -178,6 +178,9 @@ def test_rows_to_chat_messages_shape():
     assert user['role'] == 'user' and user['content'] == '帮我排查X' and user['parentId'] is None
     assert assistant['role'] == 'assistant' and assistant['content'] == '方案如下'
     assert assistant['parentId'] == 'row_u1' and assistant['done'] is True
+    # childrenIds 链自建(线性树):loadChat 直接消费 history 映射,不走
+    # convertMessagesToHistory——父节点 childrenIds 需投影侧补齐
+    assert user['childrenIds'] == ['row_a1'] and assistant['childrenIds'] == []
     # 三个非文本行按行序归入同 turn assistant 消息的 banyanEvents[](零信息损失)
     events = assistant['banyanEvents']
     assert [e['type'] for e in events] == ['tool', 'subagent', 'marker']
@@ -229,6 +232,10 @@ def test_project_session_chat_json_shape():
     assert chat['updated_at'] == 1728800100 and chat['created_at'] == 1728800000
     history = chat['chat']['history']
     assert history['currentId'] == 'row_a1' and set(history['messages']) == {'row_u1', 'row_a1'}
+    # 首条 parentId=null + 父 childrenIds 链(前端 createMessagesList 沿 parentId
+    # 上溯构造请求 messages——链断则发送消息恒空)
+    assert history['messages']['row_u1']['parentId'] is None
+    assert history['messages']['row_u1']['childrenIds'] == ['row_a1']
     assert [m['id'] for m in chat['chat']['messages']] == ['row_u1', 'row_a1']
     assert chat['current_message_id'] == 'row_a1'
     assert chat['chat']['files'] == [] and chat['meta'] == {} and chat['folder_id'] is None

@@ -4126,7 +4126,13 @@
 				: undefined
 		].filter(Boolean);
 
-		if ($temporaryChatEnabled) {
+		// banyan D16'（零双写）：引擎会话（chat id = sess_*）在 WebUI 库零行，
+		// 后端 load_messages_from_db 回填落空；未铸造的新对话（!_chatId，RF-11
+		// 服务端 mint）同理无库可查。这些对话的完整历史必须随请求携带——引擎
+		// /v1/chat/completions 只取请求内最后一条 user 文本起轮（banyan/
+		// human/v1_api.py _last_user_text），空 messages 直接 400。DB 支撑的
+		// 持久会话维持上游行为（前端消息被 middleware DB 回填覆盖，不受影响）。
+		if ($temporaryChatEnabled || !_chatId || _chatId.startsWith('sess_')) {
 			messages = [
 				...messages,
 				..._messages.map((message) => ({

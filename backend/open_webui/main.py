@@ -1482,6 +1482,8 @@ async def chat_completion(
 
                         async def run_engine_title_write_back():
                             try:
+                                from open_webui.utils import banyan_chat_adapter
+
                                 res = await generate_title(
                                     request,
                                     {'model': model_id, 'messages': title_messages, 'chat_id': chat_id},
