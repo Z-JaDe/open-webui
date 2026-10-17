@@ -2059,9 +2059,13 @@ ENABLE_APPS = os.getenv('ENABLE_APPS', 'False').lower() == 'true'
 
 CHANNEL_MODEL_RESPONSE_MODE = os.getenv('CHANNEL_MODEL_RESPONSE_MODE', 'thread')
 
-ENABLE_CALENDAR = os.getenv('ENABLE_CALENDAR', 'True').lower() == 'true'
+# D25(完整方案.md 弃用裁决):fork 本地日历退役——正本=引擎 cal_events,
+# 本地表/10s 提醒扫描停用;仅改缺省值,上游代码零删除。
+ENABLE_CALENDAR = os.getenv('ENABLE_CALENDAR', 'False').lower() == 'true'
 
-ENABLE_AUTOMATIONS = os.getenv('ENABLE_AUTOMATIONS', 'True').lower() == 'true'
+# D21(完整方案.md 弃用裁决):fork automations 定义退役——定时任务正本归引擎;
+# 统一调度器(scheduler_worker_loop)据此同时停摆 automations 与 calendar 两路扫描。
+ENABLE_AUTOMATIONS = os.getenv('ENABLE_AUTOMATIONS', 'False').lower() == 'true'
 
 ENABLE_SUBAGENTS = os.getenv('ENABLE_SUBAGENTS', 'False').lower() == 'true'
 SUBAGENTS_BACKGROUND_ENABLED = os.getenv('SUBAGENTS_BACKGROUND_ENABLED', 'False').lower() == 'true'
