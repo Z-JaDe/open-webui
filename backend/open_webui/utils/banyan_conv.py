@@ -217,6 +217,20 @@ async def patch_engine_session(conv_id: str, *, title: Optional[str] = None,
         return False
 
 
+def resolve_task_header(metadata: Optional[dict], url: str) -> bool:
+    """openai.py 转发前钩点(RF-16 C1-3/F3 半边):任务面自动轮注 X-Banyan-Task。
+
+    判定形态复用 RF-11 铸造点的 origin 判定(is_banyan_target,scheme+netloc
+    相等):转发目标指向引擎且 metadata 带 ``task`` 键(title/tags/补全等后台
+    自动轮)→ True,调用方注 ``X-Banyan-Task: 1``——引擎 v1 走无状态单发轮
+    通道(不建会话/不写行/不占 duty LRU),修复"任务轮污染人的会话历史"。
+    真实对话轮无 task 键 → False(正常带 X-Banyan-Conv 的轮不受影响)。
+    """
+    if not is_banyan_target(url):
+        return False
+    return bool(isinstance(metadata, dict) and metadata.get('task'))
+
+
 async def resolve_conv_header(metadata: Optional[dict], url: str) -> Optional[str]:
     """openai.py 转发前钩点：判定应否注入 X-Banyan-Conv，返回 conv id 或 None。
 

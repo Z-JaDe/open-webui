@@ -220,8 +220,10 @@ async def banyan_proxy(
 
     body = await request.body()
 
+    # L1-11:client 建在 try 外——下方 ConnectError/HTTPError 分支 raise 前必须
+    # aclose(与 /events 同款),否则引擎不可达时每请求漏一个连接池。
+    client = httpx.AsyncClient(timeout=httpx.Timeout(BANYAN_TIMEOUT))
     try:
-        client = httpx.AsyncClient(timeout=httpx.Timeout(BANYAN_TIMEOUT))
         upstream_request = client.build_request(
             request.method,
             target_url,
@@ -231,11 +233,13 @@ async def banyan_proxy(
         )
         upstream_response = await client.send(upstream_request, stream=True)
     except httpx.ConnectError as exc:
+        await client.aclose()
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"banyan engine unreachable at {BANYAN_ENGINE_URL}: {exc}",
         )
     except httpx.HTTPError as exc:
+        await client.aclose()
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"banyan engine request failed: {exc}",

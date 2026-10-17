@@ -40,7 +40,7 @@ from open_webui.models.users import UserModel
 from open_webui.utils.access_control import check_model_access, has_connection_access, has_permission
 from open_webui.utils.anthropic import ANTHROPIC_VERSION, get_anthropic_models, is_anthropic_url
 from open_webui.utils.auth import get_admin_user, get_verified_user
-from open_webui.utils.banyan_conv import resolve_conv_header
+from open_webui.utils.banyan_conv import resolve_conv_header, resolve_task_header
 from open_webui.utils.banyan_stream import banyan_passthrough_wrapper, strip_banyan_sse_lines
 from open_webui.utils.headers import get_headers_and_cookies, include_user_info_headers
 from open_webui.utils.json_codec import JSONCodec
@@ -1517,6 +1517,11 @@ async def generate_chat_completion(
     banyan_conv = await resolve_conv_header(metadata, url)
     if banyan_conv:
         headers['X-Banyan-Conv'] = banyan_conv
+    elif resolve_task_header(metadata, url):
+        # C1-3/F3:任务面自动轮(metadata.task:title/tags/补全)且目标为引擎 →
+        # 注 X-Banyan-Task: 1(引擎无状态单发轮通道,任务轮不建会话不写行,
+        # 防污染人的会话历史;真实对话轮无 task 键不注头)。
+        headers['X-Banyan-Task'] = '1'
 
     is_responses = api_config.get('api_type') == 'responses'
 

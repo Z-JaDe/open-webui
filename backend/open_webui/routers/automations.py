@@ -33,9 +33,11 @@ rrule ↔ schedule 翻译(引擎冻结契约 schedule_json,见 translate_rrule):
 - 裸 INTERVAL=<秒>(≥300)            → {kind:'interval',seconds}(引擎任意间隔
   的原样回程,保证投影→编辑→更新的往返不失真)
 - 其余(CUSTOM/不可表达)→ ValueError → 400 明示;凡可翻译的原 rrule 始终随
-  ``schedule_raw={'rrule': 原串}`` 兜底上报(引擎侧溯源不丢)。
+  ``schedule_raw=json.dumps({'rrule': 原串})`` 兜底上报(引擎 AutomationIn.
+  schedule_raw 是 **str**(RF-16 C1-1:dict → 422 全链断),JSON 串保证溯源不丢)。
 """
 
+import json
 import logging
 import os
 from datetime import datetime, timezone
@@ -308,14 +310,28 @@ def _project_run(run: Optional[dict], automation_id: str) -> Optional[Automation
 def _project_automation(item: dict, user_id: str) -> AutomationResponse:
     """引擎 item → AutomationResponse(前端 AutomationResponse 形状,零改消费)。
 
-    last_run/next_runs:引擎不预演未来 → next_runs 置 null(Optional 容忍,
-    前端回落 next_run_at);last_run 有则投 AutomationRunModel。
+    键名对齐引擎真键(RF-16 C1-2,红绿钉线于测试 _ENGINE_ITEM):
+    - schedule 读 ``schedule_json``(store._decode 的结构值);
+    - next_run/last_run 读 ``next_run_at``/``last_run_at``(epoch 秒);
+    - ``schedule_raw`` 为非空 str → json.loads 容错(解析失败置 {},修前
+      ``.get('rrule')`` 对 str 直接 AttributeError → 500)。
+    last_run/next_runs:引擎不预演未来且 item 只带 last_run_at 时间戳(无 run
+    对象)→ 均置 null(Optional 容忍,前端回落 next_run_at);last_run 只在
+    /runs 端点有真 status 时投影(见 _project_run)。
     """
-    schedule = item.get('schedule') or {}
-    schedule_raw = item.get('schedule_raw') or {}
+    schedule = item.get('schedule_json')
+    if not isinstance(schedule, dict):
+        schedule = item.get('schedule') if isinstance(item.get('schedule'), dict) else {}
+    schedule_raw = item.get('schedule_raw')
+    if isinstance(schedule_raw, str):
+        try:
+            schedule_raw = json.loads(schedule_raw) if schedule_raw.strip() else {}
+        except ValueError:
+            schedule_raw = {}
+    if not isinstance(schedule_raw, dict):
+        schedule_raw = {}
     rrule = str(schedule_raw.get('rrule') or '') or schedule_to_rrule(schedule)
     automation_id = str(item.get('id'))
-    last_run = _project_run(item.get('last_run'), automation_id)
     created = _to_ns(item.get('created_at')) or 0
     return AutomationResponse(
         id=automation_id,
@@ -329,11 +345,11 @@ def _project_automation(item: dict, user_id: str) -> AutomationResponse:
         },
         meta=None,
         is_active=bool(item.get('enabled', True)),
-        last_run_at=(last_run.created_at if last_run else None),
-        next_run_at=_to_ns(item.get('next_run')),
+        last_run_at=_to_ns(item.get('last_run_at')),
+        next_run_at=_to_ns(item.get('next_run_at')),
         created_at=created,
         updated_at=_to_ns(item.get('updated_at')) or created,
-        last_run=last_run,
+        last_run=None,
         next_runs=None,
     )
 
@@ -393,7 +409,8 @@ async def create_new_automation(
             'prompt': form_data.data.prompt,
             'tier': _model_to_tier(form_data.data.model_id),
             'schedule': schedule,
-            'schedule_raw': {'rrule': form_data.data.rrule},  # 原 rrule 兜底,溯源不丢
+            # 引擎 AutomationIn.schedule_raw: str(C1-1)——JSON 串,非 dict
+            'schedule_raw': json.dumps({'rrule': form_data.data.rrule}, ensure_ascii=False),
         },
     )
     # 契约 POST 体无 enabled:建后即停用补一次 PATCH
@@ -455,7 +472,8 @@ async def update_automation_by_id(
                 patch['schedule'] = rrule_to_schedule(form_data.data.rrule)
             except ValueError as e:
                 raise HTTPException(400, detail=str(e))
-            patch['schedule_raw'] = {'rrule': form_data.data.rrule}
+            # 引擎 AutomationPatch.schedule_raw: str(C1-1)——JSON 串,非 dict
+            patch['schedule_raw'] = json.dumps({'rrule': form_data.data.rrule}, ensure_ascii=False)
     patch['enabled'] = form_data.is_active is not False
 
     item = await _engine_call('PATCH', f'/automations/{id}', json=patch)

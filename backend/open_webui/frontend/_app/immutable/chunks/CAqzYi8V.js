@@ -1,0 +1,2 @@
+import{T as Y,U as x,V as E,u as O,W as k,X as A,Y as B}from"./MECnX099.js";function T(f,i){return f===i||(f==null?void 0:f[B])===i}function G(f={},i,c,t){var h=Y.r,w=k;return x(()=>{var a,r;return E(()=>{a=r,r=(t==null?void 0:t())||[],O(()=>{T(c(...r),f)||(i(f,...r),a&&T(c(...a),f)&&i(null,...a))})}),()=>{let s=w;for(;s!==h&&s.parent!==null&&s.parent.f&A;)s=s.parent;const S=()=>{r&&T(c(...r),f)&&i(null,...r)},n=s.teardown;s.teardown=()=>{S(),n==null||n()}}}),f}export{G as b};
+//# sourceMappingURL=CAqzYi8V.js.map

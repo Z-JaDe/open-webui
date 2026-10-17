@@ -560,7 +560,8 @@ async def update_feedback_by_id(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
-    # 引擎会话评分的"更新"同样走桥(引擎按 conv/message 幂等落账;fork 无该行可更新)
+    # 引擎会话评分的"更新"同样走桥(引擎 K1 落账为 append-only 多版本,消费方按
+    # seq 取末值——非幂等覆盖;fork 无该行可更新。RF-16 C1-7 口径正名,行为不变)
     bridged = await _bridge_feedback(form_data, user)
     if bridged is not None:
         return bridged

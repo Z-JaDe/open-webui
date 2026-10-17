@@ -530,3 +530,28 @@ def test_resolve_conv_header_legacy_binding_path_intact(monkeypatch):
     assert _run(bc.resolve_conv_header({'chat_id': 'legacy_uuid'}, ENGINE + '/v1')) == 'bound_legacy'
     # 后台任务轮照旧不注入(D5 无状态通道)
     assert _run(bc.resolve_conv_header({'chat_id': 'sess_x', 'task': 'title'}, ENGINE + '/v1')) is None
+
+
+# ── C1-3:X-Banyan-Task 注头判定(RF-16 红绿)──
+
+
+def test_task_header_requires_engine_target_and_task_metadata(monkeypatch):
+    """判定形态复用 RF-11 铸造点(is_banyan_target origin 相等):目标为引擎且
+    metadata 带 task(title/tags/补全等自动轮)→ 注 X-Banyan-Task: 1。"""
+    monkeypatch.setenv('BANYAN_ENGINE_URL', ENGINE)
+    assert bc.resolve_task_header({'task': True, 'chat_id': 'sess_x'}, ENGINE + '/v1') is True
+    assert bc.resolve_task_header({'task': 'title'}, ENGINE + '/v1') is True
+    # 真实对话轮(无 metadata.task)不注——引擎按有头与否分流无状态通道
+    assert bc.resolve_task_header({'chat_id': 'sess_x'}, ENGINE + '/v1') is False
+    assert bc.resolve_task_header(None, ENGINE + '/v1') is False
+    # 目标非引擎(同引擎 origin 判定形态):任务轮头不外泄给第三方连接
+    assert bc.resolve_task_header({'task': True}, 'https://api.openai.com/v1') is False
+
+
+def test_openai_py_wires_task_header_source_pin():
+    """源码钉线(C1-3):openai.py generate_chat_completion 转发处按
+    resolve_task_header(metadata.task + 引擎目标)注 X-Banyan-Task(真机联测
+    归部署阶段;openai.py 全量 import 链太重,单测以源码线+判定函数双钉)。"""
+    src = (pathlib.Path(__file__).resolve().parents[1] / 'open_webui' / 'routers' / 'openai.py').read_text()
+    assert 'X-Banyan-Task' in src, 'openai.py 未注 X-Banyan-Task(C1-3 红态)'
+    assert 'resolve_task_header' in src, '注头未复用 banyan_conv.resolve_task_header 判定'

@@ -407,8 +407,17 @@ async def mark_chats_read_by_user_id(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    updated = await Chats.mark_chats_read_by_user_id(user.id, db=db)
+    # banyan D16'(RF-16 L1-10):引擎会话已读半边——逐会话 read=true(接通
+    # adapter 既有 mark_chat_read/bulk_mark_read,此前未接线);引擎不可得只
+    # 记日志,本地半边照常返回。
+    try:
+        engine_count = await banyan_chat_adapter.bulk_mark_read()
+    except Exception as e:
+        log.warning('banyan chats: 引擎批量已读不可得: %s', e)
+        engine_count = 0
     return {
-        'updated_count': await Chats.mark_chats_read_by_user_id(user.id, db=db),
+        'updated_count': updated + engine_count,
         'folder_unread_counts': await get_folder_unread_counts(user.id, db=db),
     }
 

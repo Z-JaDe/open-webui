@@ -1,0 +1,2 @@
+import{ae as g,K as o,af as _,ag as p,I as a,ah as v,ai as i,Q as l,P as r,S as m,aj as E}from"./MECnX099.js";function x(n,d){let t=null,f=a;var s;if(a){t=m;for(var e=E(document.head);e!==null&&(e.nodeType!==v||e.data!==n);)e=i(e);if(e===null)l(!1);else{var y=i(e);e.remove(),r(y)}}a||(s=document.head.appendChild(g()));try{o(()=>{var u=_(()=>d(s));u.f|=p})}finally{f&&(l(!0),r(t))}}export{x as h};
+//# sourceMappingURL=DwKyy_Pr.js.map

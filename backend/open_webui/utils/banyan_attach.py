@@ -31,6 +31,10 @@ log = logging.getLogger(__name__)
 BANYAN_MODEL_PREFIX = 'banyan-'
 #: 附件行块头(追加在最后一条 user 文本尾部;引擎 _last_user_text 整串入会话行)
 ATTACHMENT_NOTE_HEADER = '\n\n[附件已存引擎工作区]'
+#: 引擎附件大小帽(与引擎 api UPLOAD_MAX_BYTES=20MB 同口径)。files.py 上传桥
+#: 以此预检 413 明示(C1-5):超帽转发引擎必 413,静默降级=造一个引擎工人永远
+#: 读不到的附件假象,不如上传时明示拒绝。
+ENGINE_ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024
 #: 上传转发超时(秒)——20MB 本机回环上限;失败即降级,不重试不阻断
 UPLOAD_FORWARD_TIMEOUT = 30.0
 
@@ -102,10 +106,15 @@ def engine_path_of_file(item: dict) -> str | None:
 
 
 def engine_attachment_lines(files) -> str:
-    """files 元数据 → 附件行块;无在案附件返回 ''(不发空头)。
+    """files 元数据 → 附件行块;无任何附件行返回 ''(不发空头)。
 
     形态(D18 契约,每文件一行,引擎工人按 workspace 相对路径直读):
     \\n\\n[附件已存引擎工作区]\\n- <name> @ .banyan-uploads/<path>
+
+    C1-5 降级可见:file 型条目有 name 但 engine_path 缺失(上传时引擎不可达的
+    降级件)生成 ``[附件未同步引擎: <name>(上传时引擎不可达)]`` 行——模型与人
+    都可见,不再静默丢附件;collection 等非上传件仍跳过(知识库不是引擎工作
+    区文件,不误报)。
     """
     lines: list[str] = []
     for f in files or []:
@@ -113,6 +122,9 @@ def engine_attachment_lines(files) -> str:
             continue
         path = engine_path_of_file(f)
         if not path:
+            name = str(f.get('name') or f.get('filename') or '')
+            if name and f.get('type') != 'collection':
+                lines.append(f'- [附件未同步引擎: {name}(上传时引擎不可达)]')
             continue
         name = str(f.get('name') or f.get('filename') or path.rsplit('/', 1)[-1])
         lines.append(f'- {name} @ {path}')

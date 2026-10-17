@@ -415,7 +415,20 @@ async def upload_file_handler(
         # file.meta,对话轮由 utils/banyan_attach.apply_banyan_engine_payload 携带。
         engine_path = None
         if engine_bridge:
-            from open_webui.utils.banyan_attach import forward_attachment_to_engine
+            from open_webui.utils.banyan_attach import (
+                ENGINE_ATTACHMENT_MAX_BYTES,
+                forward_attachment_to_engine,
+            )
+
+            # C1-5:引擎帽对齐预检——超帽 413 明示拒绝(引擎侧 UPLOAD_MAX_BYTES
+            # 同帽必 413;静默降级=造一个引擎工人永远读不到的附件假象)。
+            if len(contents) > ENGINE_ATTACHMENT_MAX_BYTES:
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail=ERROR_MESSAGES.DEFAULT(
+                        f'Attachment too large for banyan engine: cap {ENGINE_ATTACHMENT_MAX_BYTES // (1024 * 1024)} MB'
+                    ),
+                )
 
             engine_path = await forward_attachment_to_engine(
                 name,

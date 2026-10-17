@@ -538,6 +538,17 @@ async def bulk_set_archived(archived: bool) -> int:
     return ok
 
 
+async def bulk_mark_read() -> int:
+    """批量已读(RF-16 L1-10,POST /chats/read 的引擎半边):未归档会话逐个
+    read=true(接通既有 mark_chat_read——此前已实现未接线);返回成功数。"""
+    metas = await list_sessions_raw(archived=False, want=_LIST_MAX)
+    ok = 0
+    for m in metas:
+        if await mark_chat_read(str(m.get('id') or '')):
+            ok += 1
+    return ok
+
+
 # ── 列表投影 ─
 
 

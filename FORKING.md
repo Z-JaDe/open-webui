@@ -50,7 +50,7 @@
 | `src/lib/components/admin/BanyanEngineStatus.svelte` | v3 W4：引擎聚合状态只读卡（hook④ 的面板本体） |
 | `backend/open_webui/routers/banyan.py` | 代理桥（`/banyan/api/*` → 引擎） |
 | `backend/open_webui/main.py` | 仅一行 import + 一行 include_router（钩点③的 backend 侧，登记在案） |
-| `backend/open_webui/routers/openai.py` | 三处：流式转发包 `banyan_passthrough_wrapper` + 非流式 `strip_banyan_sse_lines`（§2 透传链路）+ conv 头注入（§3b，均在 `generate_chat_completion` 内，登记在案） |
+| `backend/open_webui/routers/openai.py` | 四处：流式转发包 `banyan_passthrough_wrapper` + 非流式 `strip_banyan_sse_lines`（§2 透传链路）+ conv 头注入 `resolve_conv_header`（§3b）+ 任务轮头注入 `resolve_task_header` → `X-Banyan-Task: 1`（RF-16 C1-3，均在 `generate_chat_completion` 内，登记在案） |
 | `backend/open_webui/routers/chats.py` | 两处（§3b quick-win）：`update_chat_by_id` 改名→引擎 title 同步；`delete_chat_by_id` 删除→引擎归档（登记在案） |
 | `backend/open_webui/models/chats.py` | 一个方法：`update_chat_meta_by_id`（conv 绑定持久化用，登记在案） |
 | `backend/open_webui/utils/banyan_stream.py`、`banyan_conv.py`、`banyan_oauth.py`、`backend/tests/` | 透传/conv 绑定/GitHub OAuth 内置凭据（§3d）实现与单测 |
@@ -226,10 +226,12 @@ meta，随后注入 `X-Banyan-Conv` 头（引擎 `_resolve_conv` 头优先）。
 即会话 id,零查询）;旧 meta 路径仅为存量副本兜底。
 
 已知边界（单用户部署可接受,如实列明）：引擎会话无 folders/tags/未读位
-（相应端点 no-op）;投影 model 名恒 `banyan-duty`（行不带档位）;跨设备
-`chat:{id}` socket 房间（typing/共享事件）以本地行为准,引擎会话不参与;
-消息级编辑/compact/fork/share 对 `sess_` 会话 401（引擎线性树,不做 WebUI 侧
-分支工程——见完整方案 P2"会话树多分支"悬置）。
+（相应端点 no-op;`POST /chats/read` 批量已读经 `bulk_mark_read` 同步引擎
+sess_ 会话——RF-16 L1-10）;投影 model 名恒 `banyan-duty`（行不带档位）;跨设备
+`chat:{id}` socket 房间（typing/共享事件）以本地行为准,引擎会话不参与（事件
+发射器对 sess_ 不回写本地行——RF-16 L1-8）;消息级编辑/compact/fork/clone/
+share 对 `sess_` 会话 401（引擎线性树,不做 WebUI 侧分支工程——见完整方案 P2
+"会话树多分支"悬置）。
 
 单测：`backend/tests/test_banyan_chat_adapter.py`（行投影形状/save no-op 零
 WebUI 库写入断言/引擎桩全端点映射/sess_ 头直通;运行

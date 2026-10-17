@@ -1,0 +1,2 @@
+import{a as r}from"./DH911u5J.js";const i=async(t,a,e)=>{const s=await fetch(`${r}/auths/mfa/${t}`,{method:t==="status"?"GET":"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json",...e?{Authorization:`Bearer ${e}`}:{}},...a?{body:JSON.stringify(a)}:{}}),o=await s.json();if(!s.ok)throw new Error(o.detail||"Authentication failed. Please try again.");return o};export{i as m};
+//# sourceMappingURL=CBH_mikZ.js.map

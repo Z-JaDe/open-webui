@@ -1,0 +1,82 @@
+import"../chunks/CWj6FrbW.js";import"../chunks/69_IOA4Y.js";import{p as y,g as A,x as w,t as P,a as f,b as W,s as I,y as M,k as v,c as e,d as $,f as p,e as U,j as S,$ as N,r as t,n as O,m as B}from"../chunks/MECnX099.js";import{i as L}from"../chunks/cGGas8gN.js";import{h as T}from"../chunks/DwKyy_Pr.js";import{i as C}from"../chunks/BPN-Tjdb.js";import{M as j}from"../chunks/BD0vpHnO.js";const D=`# banyan 架构（v2 定稿）
+
+> 本文是系统架构的唯一权威介绍，取代旧工作台 design/ 页（React 组件已退役，内容在此重构保留）。
+> 设计推演过程见 docs/设计交叉/（四环节独立设计与源码分析）。
+
+---
+
+## 根本张力（不变）
+
+**学习要求变异，可靠要求保守。** 所有门、级联、预算、权限、登记簿都是这个张力的化解机制。
+
+## 一句话（不变）
+
+在人的锚定下，从不可变记录中更新带权信念的自进化 agent 系统。
+
+## 原则（v2 增删标注）
+
+1. 关节确定性，节点自主 ✅
+2. 一台状态机，两个层级 ✅
+3. 记录不可变，信念带权 ✅
+4. 规则 → 共识 → 人 ✅
+5. 人在系统外，是唯一适应度锚点 ✅
+6. 权限与角色是数据，不是代码 ✅
+7. 派生消耗预算，预算尽必到人或必终止 ✅
+8. **（新）正本唯一**：谁拥有事实正本，谁当地基——内核/前端/外部平台都不得拥有第二真相
+9. **（新）对话是树，状态是树，账是线**——分支靠指针不靠删除
+10. **（新）无断言不落账**——验收断言是方案契约的组成部分，回归是兑现不是补丁
+
+## 总体形态
+
+\`\`\`
+banyan-webui（fork Open WebUI，唯一前端）
+    │ OpenAI 流式（对话正文） + 私有编排渲染协议（PlanCard/WaveBoard/ToolTimeline/SubagentCard/TreeSwitcher）
+banyan 引擎（Python）
+    ├─ 对话面：值班经理实例（每实例 = WebUI 一个 model 条目）
+    ├─ 编排层（自研）：波次帧+依赖单据 · 递归预算 · 断言登记簿 · 攻击复核
+    ├─ Pi sidecar（唯一 agent 内核，TS）：探索器 / 工人 / 回归 runner
+    └─ 正本：K1 事件账(对话树指针) + git 状态树(worktree auto-commit) + SQLite 投影(可重建)
+\`\`\`
+
+**职责铁律**：内核不拥有正本（会话文件镜像进 K1，是工作现场不是事实）；前端不执行工具（引擎是唯一执行者）；知识正本在知识仓（Pi skills 是单向投影缓存）。
+
+## 任务环（五段，保留）与元环
+
+进单（值班经理理单，方案=结构化契约）→ 裁决（攻击复核→人批）→ 执行（波次并发，worktree 隔离）→ 复核（断言验证+攻击面，四分流：fix/打回/子需求/问人）→ 落账（K2 收口+归因结算）。
+
+元环：断言登记簿（事件道≥90%触发）+ 定期道三类盲区探针（环境/知识保质期/低频重放，期望值排期，零发现零输出）+ 知识定期攻击。
+
+递归预算不变式：tier 单调、阈值递减、预算尽必问人或必终止。
+
+## 交叉分析：漏斗制
+
+多 Agent 用在**分工**（探索器 fan-out 真实环境检索）与**检验**（攻击镜头证伪），生成端单席综合。独立性来源排序：上下文隔离 > 模型差异 > 采样 > persona 文案。合并机械（LLM 只可分组改写，不可裁决）。同源票数打折。
+
+## 知识分层（K0-K5，保留+落位更新）
+
+K0 工作记忆（Pi 会话，私有）→ K1 事件正本（jsonl）→ K2 情节摘要（records/）→ K3 语义卡（知识仓+权重）→ K4 程序性（persona/技能，**单向投影到 Pi skills**）→ K5 宪法（原则集）。
+
+选择压力双重：归因结算（用对加权/用错降权）+ 定期攻击（被攻破降权）。防投毒：权重上限、同 scope 冲突互斥。转换管道：K1→K2 收口、K1→K3 结算产卡、K3→K4 固化、K3/K4→K5 立宪（必经人同意）。
+
+## 决策级联（保留）
+
+规则（程序化可判定）→ 交叉审查共识（独立攻击镜头）→ 人（真值锚点）。原则集是所有签字的唯一依据；问人是原则集的训练信号。
+
+## 部署形态（v2）
+
+单机三进程：banyan 引擎(:8000) + Pi sidecar(:8100) + banyan-webui(:8080，fork Open WebUI 0.12.1 Docker)。对话历史在 WebUI 库（对话面缓存），审计正本在 K1，文件状态在 git——三层各自备份。多设备=WebUI PWA/任意浏览器。
+
+**账号**：WebUI 自带账号体系（管理员注册制）；引擎对外用静态 bearer（\`BANYAN_V1_TOKEN\` 强制 > \`BANYAN_OPEN=1\` 放行 > fail-closed，全端点统一）；Supabase 账号面与 hub 联邦已整体删除（2026-10-16 清理轮）。
+
+## 与 v1 设计的差异对照
+
+| v1（旧设计页） | v2（本文） | 原因 |
+|---|---|---|
+| MAF 作为 agent 框架 | Pi SDK 唯一内核，MAF 退役 | MAF 静态图/GroupChat 与波次模型冲突；Pi 五职责全中且源码验证 |
+| 工作台 React 自研前端 | fork Open WebUI | 聊天产品是无底洞；WebUI 形态满意，短板（多Agent渲染）由 fork 补齐 |
+| Supabase 账号面 + hub 联邦 | WebUI 账号体系 + 引擎静态 bearer（三态统一） | 无消费方；已整体删除（含 E2B/Kruise 沙箱与旧 frontend/，仓库 2.3G→318M） |
+| 边级依赖（隐含） | 波次帧+依赖单据两级 | 边级 DAG 是伪需求（LLM 拆解假精度） |
+| 定期回归（隐含义务） | 事件道≥90%+定期道投机排期 | 防噪音；定期是投机不是义务 |
+| 知识分层/攻击审查/递归预算/级联 | **全部保留**，接主流程 | 设计意图验证成立 |
+`;var E=p('<div class="prose dark:prose-invert max-w-full text-sm"><!></div>'),F=p('<div class="flex flex-col h-full min-h-0"><div class="flex-1 overflow-y-auto"><div class="max-w-3xl mx-auto w-full px-4 py-8"><div class="flex items-center gap-2 mb-5"><div class="self-center flex size-7 shrink-0 items-center justify-center rounded-lg bg-black/[0.045] dark:bg-white/[0.06] text-[11px] font-semibold text-gray-700 dark:text-gray-200">B</div> <h1 class="text-xl font-semibold text-gray-900 dark:text-white"> </h1></div> <!></div></div></div>');function H(b,m){y(m,!1);const i=()=>U(K,"$i18n",u),[u,x]=I(),K=A("i18n");let o=B(!1);w(()=>{S(o,!0)}),C();var r=F();T("8z8f58",n=>{M(a=>{N.title=a??""},[()=>i().t("Architecture")])});var l=e(r),d=e(l),s=e(d),c=v(e(s),2),g=e(c,!0);t(c),t(s);var h=v(s,2);{var _=n=>{var a=E(),k=e(a);j(k,{get content(){return D},id:"banyan-architecture"}),t(a),f(n,a)};L(h,n=>{O(o)&&n(_)})}t(d),t(l),t(r),P(n=>$(g,n),[()=>i().t("Architecture")]),f(b,r),W(),x()}export{H as component};
+//# sourceMappingURL=30.B56ogUng.js.map

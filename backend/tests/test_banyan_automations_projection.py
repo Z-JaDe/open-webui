@@ -10,10 +10,11 @@ models/automations 载真实文件以保真实 pydantic 形状),引擎 API 以�
   + CUSTOM/不可表达 → ValueError(路由层 400);
 - schedule → rrule 回程(投影→编辑→更新往返稳定);
 - 引擎 item → AutomationResponse 投影形状(tier↔model_id、ns 时间、
-  last_run/next_runs Optional 容忍 null);
+  引擎真键 schedule_json/next_run_at/last_run_at(C1-2)、schedule_raw str
+  解析容错(C1-2)、last_run/next_runs Optional 容忍 null);
 - handler 投影:list 分页切片+query 过滤+status 映射 / create(频道 target 400、
-  CUSTOM 400、POST 体含 schedule+schedule_raw、建后即停补 PATCH)/ toggle(list
-  定位+PATCH enabled 取反)/ update / runs 切片 / delete;
+  CUSTOM 400、POST 体含 schedule+schedule_raw=str JSON(C1-1)、建后即停补 PATCH)/
+  toggle(list 定位+PATCH enabled 取反)/ update / runs 切片 / delete;
 - _engine_call 真错误映射:引擎不可达 → 502。
 
 运行:cd backend && ../venv/bin/python -m pytest tests/test_banyan_automations_projection.py -q
@@ -104,16 +105,18 @@ _REAL_ENGINE_CALL = ar._engine_call
 
 USER = types.SimpleNamespace(id='u1', role='admin')
 
+#: 引擎 aut_items 行真实形状(AutStore._decode 键集,RF-16 C1-2 红绿钉线):
+#: schedule_json(dict)·schedule_raw(str JSON)·last_run_at/next_run_at(epoch 秒)。
 _ENGINE_ITEM = {
     'id': 'auto1',
     'name': '每日巡检',
     'prompt': '巡检一轮',
     'tier': 'fast',
-    'schedule': {'kind': 'daily', 'time': '09:30'},
-    'schedule_raw': {'rrule': 'FREQ=DAILY;BYHOUR=9;BYMINUTE=30'},
+    'schedule_json': {'kind': 'daily', 'time': '09:30'},
+    'schedule_raw': json.dumps({'rrule': 'FREQ=DAILY;BYHOUR=9;BYMINUTE=30'}, ensure_ascii=False),
     'enabled': True,
-    'last_run': {'id': 'r9', 'status': 'success', 'created_at': 1700000000.5},
-    'next_run': 1700003600,
+    'last_run_at': 1700000000.5,
+    'next_run_at': 1700003600,
     'created_at': 1700000000,
     'updated_at': 1700000001,
 }
@@ -181,25 +184,40 @@ def test_translator_round_trip_stable():
 
 
 def test_projection_shape_fast_tier():
+    """C1-2 键名对齐红绿:投影读引擎真键 schedule_json/next_run_at/last_run_at。"""
     response = ar._project_automation(_ENGINE_ITEM, USER.id)
     assert response.id == 'auto1'
     assert response.user_id == 'u1' and response.folder_id is None
     assert response.data['model_id'] == 'banyan-fast'  # banyan-fast→tier fast 的回程
-    assert response.data['rrule'] == 'FREQ=DAILY;BYHOUR=9;BYMINUTE=30'  # 原 rrule 兜底优先
+    assert response.data['rrule'] == 'FREQ=DAILY;BYHOUR=9;BYMINUTE=30'  # raw 串解析的 rrule 兜底优先
     assert response.is_active is True
-    assert response.last_run_at == 1700000000500000000  # 引擎秒 → fork ns
-    assert response.next_run_at == 1700003600000000000
-    assert response.last_run is not None and response.last_run.status == 'success'
+    assert response.last_run_at == 1700000000500000000  # last_run_at 秒 → fork ns
+    assert response.next_run_at == 1700003600000000000  # next_run_at 秒 → fork ns
+    assert response.last_run is None  # 引擎 item 只带 last_run_at 时间戳,无 run 对象
     assert response.next_runs is None  # 引擎不预演,Optional 置 null(前端容忍)
 
 
 def test_projection_shape_heavy_defaults():
-    response = ar._project_automation({'id': 2, 'name': 'n', 'prompt': 'p', 'schedule': {'kind': 'interval', 'seconds': 4500}}, USER.id)
+    response = ar._project_automation({'id': 2, 'name': 'n', 'prompt': 'p', 'schedule_json': {'kind': 'interval', 'seconds': 4500}}, USER.id)
     assert response.id == '2'
     assert response.data['model_id'] == 'banyan-duty'  # 非 fast → heavy 的回程
-    assert response.data['rrule'] == 'INTERVAL=4500'  # 无 raw → schedule 合成回程 rrule
+    assert response.data['rrule'] == 'INTERVAL=4500'  # 无 raw → schedule_json 合成回程 rrule
     assert response.is_active is True  # 缺 enabled 容忍为 True
     assert response.last_run is None and response.last_run_at is None
+    assert response.next_run_at is None
+
+
+def test_projection_tolerates_unparseable_schedule_raw():
+    """C1-2 容错红绿:schedule_raw 为非空 str 时解析失败置 {}(修前 .get('rrule')
+    对 str 直接 AttributeError→500);非 dict 脏值同样容忍,回落 schedule_json 合成。"""
+    bad = {**_ENGINE_ITEM, 'schedule_raw': 'not-json{',
+           'schedule_json': {'kind': 'interval', 'seconds': 3600}}
+    assert ar._project_automation(bad, USER.id).data['rrule'] == 'FREQ=HOURLY;INTERVAL=1'
+    assert ar._project_automation({**_ENGINE_ITEM, 'schedule_raw': 42}, USER.id).data['rrule'] \
+        == 'FREQ=DAILY;BYHOUR=09;BYMINUTE=30'
+    # 空串(引擎缺省)同容错
+    assert ar._project_automation({**_ENGINE_ITEM, 'schedule_raw': ''}, USER.id).data['rrule'] \
+        == 'FREQ=DAILY;BYHOUR=09;BYMINUTE=30'
 
 
 # ── handler 投影(引擎桩)──
@@ -249,7 +267,11 @@ def test_handler_create_translates_and_carries_raw():
     assert (method, path) == ('POST', '/automations')
     assert body['tier'] == 'fast' and body['name'] == '每日报'
     assert body['schedule'] == {'kind': 'daily', 'time': '09:30'}
-    assert body['schedule_raw'] == {'rrule': 'FREQ=DAILY;BYHOUR=9;BYMINUTE=30'}  # 原 rrule 兜底
+    # C1-1 契约钉线:引擎 AutomationIn.schedule_raw 是 str(dict → 422 全链断),
+    # fork 发 JSON 串。单测钉死字符串形状;真机联测归部署阶段(引擎侧
+    # test_f15_api 另钉 dict→422/str→200,导出脚本同形状由引擎单测钉)。
+    assert isinstance(body['schedule_raw'], str)
+    assert json.loads(body['schedule_raw']) == {'rrule': 'FREQ=DAILY;BYHOUR=9;BYMINUTE=30'}
     assert response.id == 'auto-new' and response.data['rrule'].startswith('FREQ=DAILY')
 
 
@@ -307,7 +329,9 @@ def test_handler_update_translates_rrule():
     _, _, _, patch = stub.calls[0]
     assert patch['schedule'] == {'kind': 'weekly', 'days': ['MO', 'FR'], 'time': '18:00'}
     assert patch['tier'] == 'heavy' and patch['enabled'] is True
-    assert patch['schedule_raw'] == {'rrule': 'FREQ=WEEKLY;BYDAY=MO,FR;BYHOUR=18'}
+    # C1-1 同款钉线:PATCH 的 schedule_raw 亦为 JSON 串(真机联测归部署阶段)
+    assert isinstance(patch['schedule_raw'], str)
+    assert json.loads(patch['schedule_raw']) == {'rrule': 'FREQ=WEEKLY;BYDAY=MO,FR;BYHOUR=18'}
     assert response.data['model_id'] == 'banyan-duty'
 
 

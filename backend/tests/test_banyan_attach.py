@@ -130,6 +130,39 @@ def test_engine_attachment_lines_format_and_chain():
     assert ba.engine_attachment_lines(None) == ''
 
 
+def test_engine_attachment_lines_flags_unsynced_uploads():
+    """C1-5 红绿:file 项有 name 但 engine_path 缺失(上传时引擎不可达的降级件)
+    不再静默跳过——生成模型与人都可见的未同步行;collection 非上传件仍跳过。"""
+    files = [
+        {'type': 'file', 'id': 'f2', 'name': '丢件.pdf'},   # 无任何 engine_path 链
+        {'type': 'collection', 'name': 'fork知识库', 'collection_names': ['c1']},
+    ]
+    block = ba.engine_attachment_lines(files)
+    assert '[附件未同步引擎: 丢件.pdf(上传时引擎不可达)]' in block
+    assert 'fork知识库' not in block  # collection 不是上传件,不误报
+    assert block.startswith('\n\n[附件已存引擎工作区]\n')
+
+
+def test_engine_attachment_lines_mixed_synced_and_missed():
+    files = [
+        _file_item('.banyan-uploads/260613-abc1-报表.pdf'),
+        {'type': 'file', 'id': 'f2', 'name': '降级.txt', 'meta': {}},  # meta 空无 engine_path
+    ]
+    block = ba.engine_attachment_lines(files)
+    assert '- 报表.pdf @ .banyan-uploads/260613-abc1-报表.pdf' in block
+    assert '- [附件未同步引擎: 降级.txt(上传时引擎不可达)]' in block
+    # 全员未同步同样可见(不因空 synced 列表丢整块)
+    only_missed = ba.engine_attachment_lines([{'type': 'file', 'id': 'f3', 'name': 'a.png'}])
+    assert '附件未同步引擎: a.png' in only_missed
+
+
+def test_files_router_engine_cap_413_pinned():
+    """C1-5 源码钉线:files.py 上传桥对引擎帽(20MB)预检 413 明示,不制造
+    必丢的降级件(files.py 全量 import 链重,以源码线钉;真机联测归部署阶段)。"""
+    assert 'ENGINE_ATTACHMENT_MAX_BYTES' in _FILES
+    assert 'HTTP_413_REQUEST_ENTITY_TOO_LARGE' in _FILES
+
+
 def test_apply_banyan_engine_payload_appends_to_last_user_message():
     form_data = {'messages': [
         {'role': 'user', 'content': [

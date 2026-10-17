@@ -1,0 +1,2 @@
+import{T as d,ak as m,al as i,am as l,u as b,an as g,n as p,A as k,ab as v}from"./MECnX099.js";function x(t=!1){const n=d,e=n.l.u;if(!e)return;let f=()=>k(n.s);if(t){let a=0,s={};const _=v(()=>{let c=!1;const r=n.s;for(const o in r)r[o]!==s[o]&&(s[o]=r[o],c=!0);return c&&a++,a});f=()=>p(_)}e.b.length&&m(()=>{u(n,f),l(e.b)}),i(()=>{const a=b(()=>e.m.map(g));return()=>{for(const s of a)typeof s=="function"&&s()}}),e.a.length&&i(()=>{u(n,f),l(e.a)})}function u(t,n){if(t.l.s)for(const e of t.l.s)p(e);n()}export{x as i};
+//# sourceMappingURL=BPN-Tjdb.js.map

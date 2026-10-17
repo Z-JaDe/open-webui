@@ -1326,6 +1326,8 @@ async def get_event_emitter(request_info, update_db=True):
     if (request_info.get('chat_id') or '').startswith('channel:'):
         return await _make_channel_emitter(request_info)
 
+    from open_webui.utils.banyan_chat_adapter import is_engine_chat
+
     last_shared_emit = 0.0
     output = None
 
@@ -1335,7 +1337,10 @@ async def get_event_emitter(request_info, update_db=True):
         chat_id = request_info['chat_id']
         message_id = request_info['message_id']
         internal = request_info.get('internal') is True
-        save_to_chat = update_db and message_id and is_saved_chat_id(chat_id)
+        # L1-8(RF-16):sess_ 引擎会话消息唯一落点=引擎行,WebUI 零存储(D16')
+        # ——排除引擎会话,防事件发射器把 status/message 回写进本地 chat 行
+        # (fork 无该行时静默建行=复活双写)。
+        save_to_chat = update_db and message_id and is_saved_chat_id(chat_id) and not is_engine_chat(chat_id)
 
         if internal and event_data.get('type') == 'notification':
             return
