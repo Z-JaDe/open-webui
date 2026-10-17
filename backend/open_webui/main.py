@@ -1365,7 +1365,13 @@ async def chat_completion(
         }
 
         if is_new_chat:
-            metadata['chat_id'] = str(uuid4())
+            # banyan D16'（零双写，完整方案 §4.5/F7）：模型指向引擎的新对话先经
+            # 引擎建会话，返回的 sess_* 直接作为 chat id（chat id 即引擎会话 id，
+            # WebUI 零行，无绑定表无 meta 回写）；非引擎模型/引擎不可得时回落
+            # uuid4 + 本地行（旧路径，绝不阻断对话）。
+            from open_webui.utils.banyan_chat_adapter import mint_engine_chat_id
+
+            metadata['chat_id'] = (await mint_engine_chat_id(request, model_id)) or str(uuid4())
 
         initial_title_generation = None
         if is_new_chat and tasks and TASKS.TITLE_GENERATION in tasks:
@@ -1418,7 +1424,13 @@ async def chat_completion(
                         )
 
             if is_saved_chat_id(chat_id):
-                if is_new_chat:
+                if chat_id.startswith('sess_'):
+                    # banyan D16'（零双写）：引擎会话在 WebUI 库零存储——
+                    # userInput/assistantText/编排行的正本是引擎 chat.db（转发轮
+                    # 经 X-Banyan-Conv 由引擎落行），完成流不落库、不建标题任务
+                    # （标题由引擎首条消息逻辑生成）；事件经 socket 照常推送前端。
+                    pass
+                elif is_new_chat:
                     # The chat created below is persisted with this folder_id.
                     folder_id = metadata['folder_id']
                     if folder_id is not None and not await has_folder_write_access(user.id, folder_id):

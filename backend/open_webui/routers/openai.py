@@ -1508,10 +1508,12 @@ async def generate_chat_completion(
 
     headers, cookies = await get_headers_and_cookies(request, url, key, api_config, metadata, user=user)
 
-    # banyan P0（会话映射，utils/banyan_conv.py）：转发目标是引擎且为真实对话轮
-    # （非 title/tags 等后台任务）时，注入 X-Banyan-Conv = 该 WebUI chat 绑定的
-    # 引擎会话 id（chat.meta.banyan_conv_id，首条消息时经引擎 API 创建并回写）。
-    # 映射不可得时不注入头——降级为引擎默认实例（修复前行为），绝不阻断对话。
+    # banyan 会话映射（完整方案 §4.5 D16' 零双写，utils/banyan_conv.py 快路径 +
+    # utils/banyan_chat_adapter.py）：转发目标是引擎且为真实对话轮（非 title/tags
+    # 等后台任务）时注入 X-Banyan-Conv。chat id 以 sess_ 开头 = 本身即引擎会话 id
+    # （chats 路由适配层创建，WebUI 零行）→ 直通返回，不查绑定表；非 sess_ 存量
+    # chat 走旧 meta.banyan_conv_id 绑定兜底。映射不可得时不注入头——降级为引擎
+    # 默认实例，绝不阻断对话。
     banyan_conv = await resolve_conv_header(metadata, url)
     if banyan_conv:
         headers['X-Banyan-Conv'] = banyan_conv

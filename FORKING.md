@@ -176,6 +176,67 @@ meta，随后注入 `X-Banyan-Conv` 头（引擎 `_resolve_conv` 头优先）。
 
 ---
 
+## 3b'. chats 路由 = 引擎适配投影（D16' 零双写，完整方案 §4.5/F7）
+
+**架构终局：对话引擎单写单存，WebUI 消息零存储。** §3b 的 meta 绑定机制随之
+**退役**（模块保留，仅为非 `sess_` 存量副本的兜底/改名/归档同步服务，勿增新
+依赖）；新对话不再有 WebUI 行、无绑定表、无 meta 回写。
+
+实现：`backend/open_webui/utils/banyan_chat_adapter.py`（引擎 HTTP 沿用 §3b
+同款 env 直连；模块顶部只依赖 httpx+标准库，importlib 单测同款）。
+
+**chat id 即引擎会话 id（`sess_*`）**，两个铸造点：
+
+- `POST /api/v1/chats/new`（`routers/chats.py create_new_chat`）：先经引擎
+  建会话（标题恒空——引擎 `title_source=first_message` 自动出题），返回
+  `sess_*` 投影；引擎不可得回落本地行（绝不阻断）。
+- 完成流新建对话（`main.py chat_completion`，`is_new_chat` 分支——前端
+  sendPrompt 主路径不走 /new，chat id 由后端铸造）：`mint_engine_chat_id`
+  按 openai 连接 origin 判定模型指向引擎（`is_banyan_target`）才建引擎会话;
+  非引擎模型/引擎不可得回落 uuid4+本地行。持久化块对 `sess_` chat 整体跳过
+  （零落库、不建 WebUI 标题任务——标题由引擎首条消息逻辑生成）。
+
+**端点映射**（`routers/chats.py`；非 `sess_` 存量 chat 一律原路径不动）：
+
+| 端点 | 引擎会话行为 |
+|---|---|
+| GET `/`、`/list`、`/pinned`、`/archived`(+count) | 引擎会话列表投影并入（`merged_chat_list`，updated_at DESC 合并;引擎不可达降级为仅本地） |
+| POST `/new` | 引擎建会话 → `sess_*` chat id,WebUI 零行 |
+| GET `/{id}` | 会话 meta+行 → Chat JSON（`history.messages` 映射+平铺;行上滚补页到全量,零信息损失） |
+| POST `/{id}`（保存/改名） | **保存 no-op**（完成流不持久化,消息唯一落点=引擎行）;载荷带非空 title → 引擎 PATCH title |
+| DELETE `/{id}` | 引擎 `PATCH {archived:true}`（置态留史,不物理删） |
+| POST `/{id}/pin`、`/{id}/archive` | 读现值→取反→引擎 PATCH（toggle 语义） |
+| GET `/{id}/tags`、POST/DELETE `/{id}/tags`、`/{id}/folder`、`/{id}/unread` | no-op（引擎无 tags/folders/标未读,空表/现值回显） |
+
+**行 → 消息投影**（`rows_to_chat_messages`/`row_to_event`）：
+
+| 引擎行 kind | Open WebUI 形状 |
+|---|---|
+| userInput | `{role:'user',content:data.text}`;`confirmed===false` → `pending:true`（echo 待确认） |
+| assistantText | `{role:'assistant',content:model:'banyan-duty'}`;`status=streaming`→`done:false`（进行中）;`error/cancelled`→`error` 键 |
+| toolCall | `banyanEvents` += `BanyanToolEvent{type:'tool',call_id:row_id,name,args_summary,status:'ok'|'error',output_summary,ended_at,ts}` |
+| ticket | `banyanEvents` += `BanyanSubagentEvent{type:'subagent',subagent_id:work_id:ticket_id,title,latest_action,status:done→done/cancelled→stopped/failed→failed/其余running}`（引擎 v1 编排线同款映射,work_id 保 `/work/{id}/cancel` 可达） |
+| marker | `banyanEvents` += `{type:'marker',marker,text,ts}`（前端 BanyanEvents switch 无此分支=渲染中性,数据保留） |
+
+事件 ts 为 epoch ms（前端 types.ts 约定）;事件按行序归入同 turn 最近 assistant
+消息（其前无 assistant 行时合成空壳承载）。前端零改——流式期走既有 socket
+`{type:'banyan'}` 通道,刷新后由本投影从引擎行重建 `message.banyanEvents`。
+
+**头注入**：`resolve_conv_header`（§3b）对 `sess_` chat 直通返回（chat id 本身
+即会话 id,零查询）;旧 meta 路径仅为存量副本兜底。
+
+已知边界（单用户部署可接受,如实列明）：引擎会话无 folders/tags/未读位
+（相应端点 no-op）;投影 model 名恒 `banyan-duty`（行不带档位）;跨设备
+`chat:{id}` socket 房间（typing/共享事件）以本地行为准,引擎会话不参与;
+消息级编辑/compact/fork/share 对 `sess_` 会话 401（引擎线性树,不做 WebUI 侧
+分支工程——见完整方案 P2"会话树多分支"悬置）。
+
+单测：`backend/tests/test_banyan_chat_adapter.py`（行投影形状/save no-op 零
+WebUI 库写入断言/引擎桩全端点映射/sess_ 头直通;运行
+`cd backend && ../venv/bin/python -m pytest tests/test_banyan_chat_adapter.py -q`）。
+
+---
+
 ## 3c. 部署（env-only 开关 + 嵌入模型本地化）
 
 **env-only 开关**（只进进程 env，写 DB 无效；源自审计 11b 清单，见
@@ -261,6 +322,48 @@ env 覆盖生效）。
 **signup 重开**：DB `config` 表 `ui.enable_signup=true`（运行库已写入；注意
 上游行为——首个注册用户成为 admin 时会自动把该键写回 false，此后不再触发）；
 启动脚本 env `ENABLE_SIGNUP=true`（新库种子/缺省回退，DB 行存在时以 DB 为准）。
+
+---
+
+## 3e. 存储单根（D26，完整方案.md §12.5/F10）
+
+**纪律**：一个 `BANYAN_HOME` 收纳三进程全部状态，杜绝"sidecar 落 `~/.banyan`
+死目录、WebUI 落 `backend/data`"的活分裂。fork 侧的义务只有一条——**必须由
+启动脚本显式给 `DATA_DIR`**（fork 后端从 `open_webui.env.DATA_DIR` 定位
+`webui.db/vector_db/uploads/cache`，缺省回落到仓库内 `backend/data`，属分裂根）。
+
+**env 约定**（`scripts/start-all.sh` 已统一注入，手工起进程时须自带）：
+
+| 进程 | env | 值 | 缺省回落(=分裂根,禁止) |
+|---|---|---|---|
+| 引擎 | `BANYAN_HOME` | `$HOME_DIR` | `~/.banyan` |
+| sidecar | `BANYAN_SIDECAR_HOME` | `$HOME_DIR/pi-sidecar`（stateDir；agentDir/sessionsDir 在其下） | `~/.banyan/pi-sidecar` |
+| 引擎(K4 投影) | `BANYAN_SIDECAR_HOME` | 同值——引擎 `_pi_skills_dir` 的 env 优先级高于 `~/.banyan` 回落,技能投影落进 sidecar 真实 stateDir | `~/.banyan/pi-sidecar` |
+| WebUI | `DATA_DIR` | `$HOME_DIR/webui`（start-all 已先 `mkdir -p`） | `<fork>/backend/data` |
+
+**存量迁移**（停机一次性，幂等，支持 `--dry-run`）：
+
+```bash
+scripts/stop-all.sh                 # 三进程(engine:8000/sidecar:8100/webui:8080)必须先停
+scripts/migrate-to-home.sh /tmp/banyan-final --dry-run   # 先看清单
+scripts/migrate-to-home.sh /tmp/banyan-final             # 实际迁移
+```
+
+脚本动作：①校验三进程已停；②`~/.banyan/pi-sidecar/{agent,sessions}` →
+`$HOME_DIR/pi-sidecar/`；③`<webui>/backend/data/{webui.db*,vector_db,uploads,cache}`
+→ `$HOME_DIR/webui/`；④旧 `~/.banyan` 其余（config.toml/events/state/knowledge/
+workspace）归档到 `~/.banyan-archive-<date>/`——**`remote.json` 保留原位**
+（桌面壳活读）；归档后打印 API key 轮换提示（旧家配置已双份落盘明文密钥）。
+已迁过的条目自动跳过，重复执行无副作用。
+
+**弃用开关同步登记（D25/D21 过渡封堵，仅改缺省值不删代码）**：
+`backend/open_webui/config.py` 中 `ENABLE_CALENDAR`、`ENABLE_AUTOMATIONS`
+的 env 缺省已改 `False`（连带 `DEFAULT_CONFIG` 的 `calendar.enable` /
+`automations.enable` 种子值；统一调度器 `scheduler_worker_loop` 据此停摆
+本地日历提醒扫描与 automations 执行——正本归引擎 cal_events 与引擎定时任务）。
+env 显式 `ENABLE_CALENDAR=true` 仍可临时复活（排障用，口径为弃用）。
+注意：`seed_defaults` 只对 DB 中**不存在**的键下种，存量库已写 true 的行需在
+管理设置或 SQL 置 false 才热生效。
 
 ---
 

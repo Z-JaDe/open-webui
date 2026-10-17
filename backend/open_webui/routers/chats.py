@@ -42,6 +42,7 @@ from open_webui.tasks import get_response_streams_by_chat_id, has_active_tasks, 
 from open_webui.utils.access_control import filter_allowed_access_grants, has_permission
 from open_webui.utils.access_control.folders import has_folder_write_access
 from open_webui.utils.auth import bearer_security, get_admin_user, get_current_user, get_verified_user
+from open_webui.utils import banyan_chat_adapter
 from open_webui.utils.banyan_conv import conv_id_for_chat, patch_engine_session
 from open_webui.utils.chat_fork import build_fork_history
 from open_webui.utils.context_compaction import compact_chat_branch, get_chat_context_usage
@@ -199,6 +200,64 @@ async def get_folder_unread_counts(user_id: str, db: AsyncSession | None = None)
     return unread_counts
 
 
+############################
+# banyan D16'（零双写）：chats 路由 = 引擎适配投影
+# chat id 即引擎会话 id（sess_*）；下列 helper 供各端点把引擎会话并入投影，
+# 非 sess_ 的存量本地 chat 一律走原 WebUI 路径（只读到自然淘汰，不迁移）。
+############################
+
+
+async def engine_chat_list_items(
+    request: Request, summaries: list[dict]
+) -> list[ChatTitleIdResponse]:
+    """引擎会话摘要 → 列表项；active 用 redis 任务表（引擎会话的流式任务
+    同样以 sess_* 注册），不走 ChatMessages 本地查询。"""
+    items = []
+    for summary in summaries:
+        item = ChatTitleIdResponse(
+            id=summary['id'],
+            title=summary['title'],
+            updated_at=summary['updated_at'],
+            created_at=summary['created_at'],
+            archived=summary['archived'],
+        )
+        try:
+            item.active = await has_active_tasks(request.app.state.redis, item.id)
+        except Exception:
+            item.active = False
+        items.append(item)
+    return items
+
+
+async def merged_chat_list(
+    request: Request,
+    legacy_chats: list[ChatTitleIdResponse],
+    *,
+    archived: bool = False,
+    pinned: bool | None = None,
+    page: int | None = None,
+    limit: int | None = None,
+) -> list[ChatTitleIdResponse]:
+    """引擎会话投影 + 存量本地列表 合并（updated_at DESC）。
+    分页近似：引擎按 limit×page 拉足后切片，与本地页合并截断——两列表各自
+    页对齐时全局分页无重复、无遗漏（单机数据量小，见适配器注释）。"""
+    limit = limit or 60
+    legacy_chats = await add_active_state_to_chat_list(request, legacy_chats)
+    try:
+        engine_summaries = await banyan_chat_adapter.list_chats(
+            archived=archived, pinned=pinned, page=page, limit=limit
+        )
+        engine_items = await engine_chat_list_items(request, engine_summaries)
+    except Exception as e:
+        # 引擎不可达：列表降级为仅存量本地 chat（绝不炸侧栏）
+        log.warning('banyan chats: 引擎会话列表不可得: %s', e)
+        engine_items = []
+    merged = sorted([*engine_items, *legacy_chats], key=lambda c: c.updated_at or 0, reverse=True)
+    if page is not None:
+        merged = merged[:limit]
+    return merged
+
+
 class ChatConfigForm(BaseModel):
     CONTEXT_COMPACTION_MODEL: str | None = ''
     ENABLE_CONTEXT_COMPACTION: bool
@@ -327,7 +386,17 @@ async def get_session_user_chat_list(
                 sort_dir=sort_dir,
                 db=db,
             )
-        return await add_active_state_to_chat_list(request, chats)
+        # banyan D16'：引擎会话并入投影（全部引擎会话可见）；include_pinned=False
+        # 时排除置顶（与本地语义一致，置顶走 /pinned 视图）。引擎无 folders/
+        # 自定义排序，include_folders/sort_by 对引擎部分不生效（单一 updated_at 序）。
+        return await merged_chat_list(
+            request,
+            chats,
+            archived=False,
+            pinned=None if include_pinned else False,
+            page=page,
+            limit=60,
+        )
     except Exception as e:
         log.exception(e)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=ERROR_MESSAGES.DEFAULT())
@@ -832,6 +901,13 @@ async def create_new_chat(
             detail=ERROR_MESSAGES.NOT_FOUND,
         )
 
+    # banyan D16'（零双写）：新对话先经引擎建会话，返回的 sess_* 直接作为 chat id，
+    # WebUI 零行（标题留空由引擎首条消息自动出题）。引擎不可得时回落本地行
+    # （旧路径，绝不阻断对话）。folders/tags 对引擎会话不适用（投影忽略）。
+    engine_chat = await banyan_chat_adapter.create_chat(str(user.id))
+    if engine_chat is not None:
+        return ChatResponse.model_validate(engine_chat)
+
     try:
         chat = await Chats.insert_new_chat(str(uuid4()), user.id, form_data, db=db)
         await publish_event(
@@ -1026,7 +1102,8 @@ async def get_user_pinned_chats(
     request: Request, user=Depends(get_verified_user), db: AsyncSession = Depends(get_async_session)
 ):
     chats = await Chats.get_pinned_chats_by_user_id(user.id, db=db)
-    return await add_active_state_to_chat_list(request, chats)
+    # banyan D16'：引擎置顶会话并入（引擎 pinned 过滤在投影侧完成）。
+    return await merged_chat_list(request, chats, pinned=True)
 
 
 ############################
@@ -1151,7 +1228,8 @@ async def get_archived_session_user_chat_list(
         limit=limit,
         db=db,
     )
-    return await add_active_state_to_chat_list(request, chats)
+    # banyan D16'：引擎归档会话并入（删除=archived=true 的会话在此可见）。
+    return await merged_chat_list(request, chats, archived=True, page=page, limit=limit)
 
 
 ############################
@@ -1164,7 +1242,13 @@ async def get_archived_session_user_chat_count(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
-    return await Chats.count_archived_chats_by_user_id(user.id, db=db)
+    # banyan D16'：计数并入引擎归档会话（引擎不可得时只计本地）。
+    engine_count = 0
+    try:
+        engine_count = len(await banyan_chat_adapter.list_chats(archived=True))
+    except Exception as e:
+        log.warning('banyan chats: 引擎归档计数不可得: %s', e)
+    return engine_count + await Chats.count_archived_chats_by_user_id(user.id, db=db)
 
 
 ############################
@@ -1414,6 +1498,15 @@ async def get_chat_by_id(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    # banyan D16'：引擎会话投影（meta+行 → Chat JSON，userInput/assistantText/
+    # toolCall/ticket/marker 行 → 消息+banyanEvents）；不读不写 WebUI 库。
+    if banyan_chat_adapter.is_engine_chat(id):
+        chat = await banyan_chat_adapter.get_chat(id, str(user.id))
+        if chat is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=ERROR_MESSAGES.NOT_FOUND)
+        chat['chat']['share_mode'] = None
+        return chat
+
     chat = await Chats.get_accessible_chat_by_id(
         id,
         user,
@@ -1450,6 +1543,24 @@ async def update_chat_by_id(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    # banyan D16'：引擎会话的"保存"=no-op（完成的完成流不持久化，消息唯一落点=
+    # 引擎行），改名/title 经引擎 PATCH；WebUI 库零写入。
+    if banyan_chat_adapter.is_engine_chat(id):
+        chat = await banyan_chat_adapter.update_chat(id, form_data.chat, str(user.id))
+        if chat is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
+            )
+        await publish_event(
+            request,
+            EVENTS.CHAT_UPDATED,
+            actor=user,
+            subject_id=id,
+            data={'title': chat.get('title')},
+        )
+        return ChatResponse.model_validate(chat)
+
     chat = await Chats.get_chat_by_id_and_user_id(id, user.id, db=db)
     if chat:
         touch = 'history' in form_data.chat or 'messages' in form_data.chat
@@ -1675,6 +1786,28 @@ async def delete_chat_by_id(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    # banyan D16'：引擎会话删除 = 引擎 archived=true（置态留史，不物理删，正本
+    # 在引擎）；WebUI 库无行可删。引擎不可得时 404（与旧行为同形）。
+    if banyan_chat_adapter.is_engine_chat(id):
+        if user.role != 'admin' and not await has_permission(
+            user.id, 'chat.delete', await Config.get('user.permissions')
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
+            )
+        await stop_item_tasks(request.app.state.redis, id)
+        if not await banyan_chat_adapter.delete_chat(id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=ERROR_MESSAGES.NOT_FOUND)
+        await publish_event(
+            request,
+            EVENTS.CHAT_DELETED,
+            actor=user,
+            subject_id=id,
+            data={'owner_id': user.id, 'engine_archived': True},
+        )
+        return True
+
     # Authorize before any side effect: cancelling a chat's in-flight tasks must
     # not be reachable for a chat the caller may not delete.
     if user.role == 'admin':
@@ -1736,6 +1869,12 @@ async def delete_chat_by_id(
 async def get_pinned_status_by_id(
     id: str, user=Depends(get_verified_user), db: AsyncSession = Depends(get_async_session)
 ):
+    # banyan D16'：引擎会话 pinned 读引擎 meta。
+    if banyan_chat_adapter.is_engine_chat(id):
+        meta = await banyan_chat_adapter.get_session_meta(id)
+        if meta is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=ERROR_MESSAGES.DEFAULT())
+        return bool(meta.get('pinned'))
     chat = await Chats.get_chat_by_id_and_user_id(id, user.id, db=db)
     if chat:
         return chat.pinned
@@ -1752,6 +1891,19 @@ async def get_pinned_status_by_id(
 async def pin_chat_by_id(
     request: Request, id: str, user=Depends(get_verified_user), db: AsyncSession = Depends(get_async_session)
 ):
+    # banyan D16'：引擎会话 pinned 翻转（读现值→取反→引擎 PATCH）。
+    if banyan_chat_adapter.is_engine_chat(id):
+        chat = await banyan_chat_adapter.toggle_chat_flag(id, 'pinned', str(user.id))
+        if chat is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=ERROR_MESSAGES.DEFAULT())
+        await publish_event(
+            request,
+            EVENTS.CHAT_PINNED if chat.get('pinned') else EVENTS.CHAT_UNPINNED,
+            actor=user,
+            subject_id=id,
+            subject_type='chat',
+        )
+        return ChatResponse.model_validate(chat)
     chat = await Chats.get_chat_by_id_and_user_id(id, user.id, db=db)
     if chat:
         chat = await Chats.toggle_chat_pinned_by_id(id, db=db)
@@ -2038,6 +2190,22 @@ async def archive_chat_by_id(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    # banyan D16'：引擎会话 archived 翻转；归档侧取消本会话 in-flight 任务
+    # （与本地语义一致）。
+    if banyan_chat_adapter.is_engine_chat(id):
+        chat = await banyan_chat_adapter.toggle_chat_flag(id, 'archived', str(user.id))
+        if chat is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=ERROR_MESSAGES.DEFAULT())
+        if chat.get('archived'):
+            await stop_item_tasks(request.app.state.redis, id)
+        await publish_event(
+            request,
+            EVENTS.CHAT_ARCHIVED if chat.get('archived') else EVENTS.CHAT_UNARCHIVED,
+            actor=user,
+            subject_id=id,
+            subject_type='chat',
+        )
+        return ChatResponse.model_validate(chat)
     chat = await Chats.get_chat_by_id_and_user_id(id, user.id, db=db)
     if chat:
         chat = await Chats.toggle_chat_archive_by_id(id, db=db)
@@ -2237,6 +2405,15 @@ async def mark_chat_unread_by_id(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    # banyan D16'：引擎会话无"标未读"（引擎 PATCH 只有 read=true 单向）——no-op
+    # 返回现形；folder 维度引擎会话不参与。
+    if banyan_chat_adapter.is_engine_chat(id):
+        return {
+            'chat_id': id,
+            'last_read_at': None,
+            'folder_id': None,
+            'folder_unread_counts': await get_folder_unread_counts(user.id, db=db),
+        }
     chat = await Chats.mark_chat_unread_by_id(id, user.id, db=db)
     if not chat:
         raise HTTPException(
@@ -2261,6 +2438,12 @@ async def update_chat_folder_id_by_id(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    # banyan D16'：引擎会话无 folders——no-op 返回投影现值。
+    if banyan_chat_adapter.is_engine_chat(id):
+        chat = await banyan_chat_adapter.get_chat(id, str(user.id))
+        if chat is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=ERROR_MESSAGES.DEFAULT())
+        return ChatResponse.model_validate(chat)
     chat = await Chats.get_chat_by_id_and_user_id(id, user.id, db=db)
     if chat:
         # None is allowed: it moves the chat out of any folder.
@@ -2290,6 +2473,9 @@ async def update_chat_folder_id_by_id(
 
 @router.get('/{id}/tags', response_model=list[TagModel])
 async def get_chat_tags_by_id(id: str, user=Depends(get_verified_user), db: AsyncSession = Depends(get_async_session)):
+    # banyan D16'：引擎会话无 tags——返回空（前端 catch 原路径会 401 噪音，此处静默空表）。
+    if banyan_chat_adapter.is_engine_chat(id):
+        return []
     chat = await Chats.get_accessible_chat_by_id(
         id,
         user,
@@ -2316,6 +2502,9 @@ async def add_tag_by_id_and_tag_name(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    # banyan D16'：引擎会话无 tags——no-op 空表（加标签请求被吸收，不落库）。
+    if banyan_chat_adapter.is_engine_chat(id):
+        return []
     chat = await Chats.get_chat_by_id_and_user_id(id, user.id, db=db)
     if chat:
         tags = chat.meta.get('tags', [])
@@ -2357,6 +2546,9 @@ async def delete_tag_by_id_and_tag_name(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    # banyan D16'：引擎会话无 tags——no-op 空表。
+    if banyan_chat_adapter.is_engine_chat(id):
+        return []
     chat = await Chats.get_chat_by_id_and_user_id(id, user.id, db=db)
     if chat:
         await Chats.delete_tag_by_id_and_user_id_and_tag_name(id, user.id, form_data.name, db=db)

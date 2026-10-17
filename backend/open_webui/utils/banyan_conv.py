@@ -1,5 +1,14 @@
 """banyan conv 绑定（P0 修复，FU-2 执行项 1 / 审计域10 头号项）。
 
+**D16' 退役说明（完整方案 §4.5/F7，勿增新依赖）：** chat id 即引擎会话 id
+（``sess_*``）后，本模块的"建会话+meta 绑定回写"机制退役——新对话的引擎会话
+由 ``utils/banyan_chat_adapter.py``（chats 路由适配投影）创建，``sess_*`` 直接
+作为 chat id，``resolve_conv_header`` 对 sess_ chat 直通返回（不再查绑定表）。
+本模块保留仅为两类存量场景：
+- 非 sess_ 存量 chat（旧副本）的绑定解析/删除归档/改名同步，只读到自然淘汰；
+- ``resolve_conv_header`` 的旧路径兜底（meta.banyan_conv_id）。
+新代码一律走 banyan_chat_adapter；不要在本模块加新功能。
+
 背景：引擎 v1 会话映射为 ``X-Banyan-Conv 头 > model id 编码 > banyan-duty=默认实例``
 （``banyan/human/v1_api.py:_resolve_conv``）。fork 透传层此前不注入任何 conv 头，
 所有 WebUI 对话汇入引擎同一个默认 conv——树页/审计页按 conv 组织的假定失真，
@@ -214,7 +223,10 @@ async def resolve_conv_header(metadata: Optional[dict], url: str) -> Optional[st
     判定链（任一不满足即 None，调用方不注入头）：
     1. 转发目标是引擎（origin 相等）；
     2. metadata 带已落库 chat_id（临时/本地/频道对话不映射）；
-    3. 非后台任务轮（metadata.task 为空）。
+    3. **D16' 快路径：chat_id 以 sess_ 开头 → 本身即引擎会话 id，直通返回**
+       （不查绑定表、不建会话——绑定机制已退役）；
+    4. 非 sess_ 存量 chat：旧路径 meta 绑定兜底（首条消息建会话+回写，只服务
+       存量副本到自然淘汰）。
     """
     if not is_banyan_target(url):
         return None
@@ -225,6 +237,9 @@ async def resolve_conv_header(metadata: Optional[dict], url: str) -> Optional[st
     chat_id = metadata.get('chat_id')
     if not is_saved_chat_id(chat_id):
         return None
+    # D16'：chat id 即引擎会话 id——零查询直通（适配器见 banyan_chat_adapter.py）
+    if isinstance(chat_id, str) and chat_id.startswith('sess_'):
+        return chat_id
     try:
         return await resolve_conv_for_chat(str(chat_id))
     except Exception as e:  # 绝不让映射问题炸掉对话
