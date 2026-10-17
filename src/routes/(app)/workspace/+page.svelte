@@ -6,7 +6,7 @@
 	onMount(() => {
 		if ($user?.role !== 'admin') {
 			if ($user?.permissions?.workspace?.models) {
-				goto('/workspace/models', { replaceState: true });
+				goto('/workspace/knowledge', { replaceState: true });
 			} else if ($user?.permissions?.workspace?.knowledge) {
 				goto('/workspace/knowledge', { replaceState: true });
 			} else if ($user?.permissions?.workspace?.prompts) {

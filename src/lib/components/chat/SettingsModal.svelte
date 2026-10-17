@@ -21,15 +21,13 @@
 	import Interface from './Settings/Interface.svelte';
 	import Notifications from './Settings/Notifications.svelte';
 	import Shortcuts from './Settings/Shortcuts.svelte';
-	import Audio from './Settings/Audio.svelte';
-	import DataControls from './Settings/DataControls.svelte';
+		import DataControls from './Settings/DataControls.svelte';
 	import Usage from './Settings/Usage.svelte';
 	import ArchivedChats from './Settings/ArchivedChats.svelte';
 	import Personalization from './Settings/Personalization.svelte';
 	import Search from '../icons/Search.svelte';
 	import Connections from './Settings/Connections.svelte';
-	import Integrations from './Settings/Integrations.svelte';
-	import DatabaseSettings from '../icons/DatabaseSettings.svelte';
+		import DatabaseSettings from '../icons/DatabaseSettings.svelte';
 	import SettingsAlt from '../icons/SettingsAlt.svelte';
 	import Link from '../icons/Link.svelte';
 	import UserCircle from '../icons/UserCircle.svelte';
@@ -47,20 +45,10 @@
 	import AdminGeneral from '$lib/components/admin/Settings/General.svelte';
 	import AdminAuthentication from '$lib/components/admin/Settings/Authentication.svelte';
 	import AdminConnections from '$lib/components/admin/Settings/Connections.svelte';
-	import AdminModels from '$lib/components/admin/Settings/Models.svelte';
-	import AdminSubagents from '$lib/components/admin/Settings/Subagents.svelte';
-	import AdminEvaluations from '$lib/components/admin/Settings/Evaluations.svelte';
-	import AdminAnalytics from '$lib/components/admin/Analytics.svelte';
-	import AdminIntegrations from '$lib/components/admin/Settings/Integrations.svelte';
-	import AdminApps from '$lib/components/admin/Settings/Apps.svelte';
-	import AdminDocuments from '$lib/components/admin/Settings/Documents.svelte';
-	import AdminWebSearch from '$lib/components/admin/Settings/WebSearch.svelte';
-	import AdminCodeExecution from '$lib/components/admin/Settings/CodeExecution.svelte';
-	import AdminInterface from '$lib/components/admin/Settings/Interface.svelte';
-	import AdminAudio from '$lib/components/admin/Settings/Audio.svelte';
-	import AdminImages from '$lib/components/admin/Settings/Images.svelte';
-	import AdminPipelines from '$lib/components/admin/Settings/Pipelines.svelte';
-	import AdminDatabase from '$lib/components/admin/Settings/Database.svelte';
+				import AdminAnalytics from '$lib/components/admin/Analytics.svelte';
+			import AdminDocuments from '$lib/components/admin/Settings/Documents.svelte';
+			import AdminInterface from '$lib/components/admin/Settings/Interface.svelte';
+				import AdminDatabase from '$lib/components/admin/Settings/Database.svelte';
 
 	const i18n: Writable<any> = getContext('i18n');
 

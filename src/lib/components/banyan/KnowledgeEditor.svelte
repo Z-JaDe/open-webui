@@ -1,9 +1,8 @@
 <script lang="ts">
-	import ModelSettingsLabel from './ModelSettingsLabel.svelte';
 	import { getContext, onMount } from 'svelte';
 	import { config, settings, user } from '$lib/stores';
 
-	import KnowledgeSelector from './Knowledge/KnowledgeSelector.svelte';
+	import KnowledgeSelector from '$lib/components/workspace/Knowledge.svelte';
 	import FileItemModal from '$lib/components/common/FileItemModal.svelte';
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
 	import Spinner from '$lib/components/common/Spinner.svelte';
@@ -202,12 +201,9 @@
 		>
 			<span class="text-gray-600 dark:text-gray-400"
 				><slot name="label"
-					><ModelSettingsLabel
-						label={$i18n.t('Knowledge')}
-						description={$i18n.t(
-							'Attach knowledge bases, notes, or files for this model to reference in chats.'
-						)}
-					/></slot
+					><span class="text-xs font-normal text-gray-600 dark:text-gray-400"
+						>{$i18n.t('Knowledge')}</span
+					></slot
 				></span
 			>
 			<span

@@ -14,7 +14,7 @@
 	import ModelSelector from '$lib/components/chat/ModelSelector/Selector.svelte';
 
 	import Textarea from '$lib/components/common/Textarea.svelte';
-	import Knowledge from '$lib/components/workspace/Models/Knowledge.svelte';
+	import Knowledge from '$lib/components/banyan/KnowledgeEditor.svelte';
 	import { getFolderById } from '$lib/apis/folders';
 	const i18n = getContext<Writable<I18n>>('i18n');
 
