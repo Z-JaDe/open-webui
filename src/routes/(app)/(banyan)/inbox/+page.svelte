@@ -19,6 +19,7 @@
 		type BanyanInboxUnread
 	} from '$lib/apis/banyan';
 	import BanyanPageNav from '$lib/components/banyan/BanyanPageNav.svelte';
+	import { subscribeBanyanEvents, createBanyanRefresher } from '$lib/stores/banyanEvents';
 	import Check from '$lib/components/icons/Check.svelte';
 	import XMark from '$lib/components/icons/XMark.svelte';
 
@@ -220,6 +221,17 @@
 	const fmtTime = (ms?: number) => (ms ? new Date(ms).toLocaleString() : '');
 
 	onMount(load);
+
+	// F8/D15:K1 事件驱动重取——inbox.* 帧(落箱/已读/处置/超时)到达即刷新当前 tab;
+	// 页面在后台只记待办、回前台补取(防后台风暴),3s 节流。徽标同源逻辑在 Sidebar。
+	onMount(() => {
+		const refresher = createBanyanRefresher(load);
+		const unsubscribe = subscribeBanyanEvents(['inbox.'], refresher.trigger);
+		return () => {
+			unsubscribe();
+			refresher.dispose();
+		};
+	});
 </script>
 
 <svelte:head><title>{$i18n.t('Inbox')} · banyan</title></svelte:head>

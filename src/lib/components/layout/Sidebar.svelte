@@ -94,8 +94,11 @@
 	import MoreHorizontalIcon from './Sidebar/icons/MoreHorizontal.svelte';
 	import MobileSwipePanel from '../common/MobileSwipePanel.svelte';
 
+	// D23:侧栏 Notes 入口摘除(笔记是方案外内容孤岛;个人手记走对话/知识卡)。
+	// /notes 路由本身不动(F14 封堵包归 RF-14');存量 settings.pinnedMenuItems 里
+	// 残留的 'notes' 由下方 pinnedItems 派生处一并过滤。
 	const BREAKPOINT = 768;
-	const DEFAULT_PINNED_ITEMS = ['notes', 'workspace'];
+	const DEFAULT_PINNED_ITEMS = ['workspace'];
 
 	let scrollTop = 0;
 
@@ -133,6 +136,9 @@
 	// banyan 任务分区入口（钩点③；WE-7 起含 /arch 架构页；v3 W2/W3 追加 inbox/cal 两行）
 	// v3 W2 信箱徽标数据源（import 与徽标逻辑一并登记在钩点③内）
 	import { getBanyanInbox } from '$lib/apis/banyan';
+	// F8/D15:K1 事件流订阅(信箱徽标事件驱动);F4/D10:decision 落箱 Web 通知
+	import { subscribeBanyanEvents, createBanyanRefresher } from '$lib/stores/banyanEvents';
+	import { notifyBanyanDecision } from '$lib/utils/banyanNotify';
 
 	const banyanTaskEntries = [
 		{ id: 'registry', label: 'Registry', href: '/registry', prefix: '/registry' },
@@ -145,10 +151,11 @@
 		{ id: 'cal', label: 'Calendar', href: '/cal', prefix: '/cal' }
 	];
 
-	// v3 W2（V-10）：信箱条目挂待裁决数徽标——60s 轮询 decision 未读数，
-	// 任何异常静默置 0（引擎不在是常态）；组件销毁清 timer。
+	// v3 W2（V-10）：信箱条目挂待裁决数徽标。D15/F8 起事件驱动：inbox.* 帧到达即重取，
+	// 60s 轮询按裁决退役（SSE 断线退避重连由浏览器原生承担）；取数失败静默置 0 语义
+	// 保留（引擎不在是常态）。F4/D10：inbox.opened 且 category=decision（需人裁决）
+	// →Web 通知（M-8 语义，见 banyanNotify）；done/notice 静默只动计数。
 	let banyanInboxPending = 0;
-	let banyanInboxTimer: ReturnType<typeof setInterval> | null = null;
 	const refreshBanyanInboxPending = async () => {
 		try {
 			const snapshot = await getBanyanInbox({ status: 'open', category: 'decision', limit: 1 });
@@ -159,12 +166,24 @@
 	};
 	onMount(() => {
 		refreshBanyanInboxPending();
-		banyanInboxTimer = setInterval(refreshBanyanInboxPending, 60 * 1000);
-		return () => {
-			if (banyanInboxTimer) {
-				clearInterval(banyanInboxTimer);
-				banyanInboxTimer = null;
+		// 徽标轻量(单 GET),不设 focus 门;1s 窗口吸收事件连发
+		const refresher = createBanyanRefresher(refreshBanyanInboxPending, {
+			minIntervalMs: 1000,
+			requireVisible: false
+		});
+		const unsubscribe = subscribeBanyanEvents(['inbox.'], (frame) => {
+			if (frame.kind === 'inbox.opened' && frame.payload?.category === 'decision') {
+				notifyBanyanDecision({
+					id: typeof frame.payload?.id === 'string' ? frame.payload.id : undefined,
+					title: typeof frame.payload?.title === 'string' ? frame.payload.title : '',
+					body: typeof frame.payload?.body === 'string' ? frame.payload.body : ''
+				});
 			}
+			refresher.trigger();
+		});
+		return () => {
+			unsubscribe();
+			refresher.dispose();
 		};
 	});
 
@@ -197,7 +216,10 @@
 		folderRegistry[folder.id]?.setFolderItems?.();
 	};
 
-	$: pinnedItems = $settings?.pinnedMenuItems ?? DEFAULT_PINNED_ITEMS;
+	// D23:过滤存量 settings 里残留的 'notes',保证侧栏入口摘除对老用户同样生效
+	$: pinnedItems = ($settings?.pinnedMenuItems ?? DEFAULT_PINNED_ITEMS).filter(
+		(id) => id !== 'notes'
+	);
 
 	$: isMenuItemVisible = (id) => {
 		switch (id) {

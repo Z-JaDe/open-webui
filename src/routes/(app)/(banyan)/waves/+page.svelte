@@ -11,6 +11,7 @@
 
 	import type i18nType from '$lib/i18n';
 	import { getBanyanPlans, type BanyanPlanListItem } from '$lib/apis/banyan';
+	import { subscribeBanyanEvents, createBanyanRefresher } from '$lib/stores/banyanEvents';
 	import BanyanPageNav from '$lib/components/banyan/BanyanPageNav.svelte';
 
 	dayjs.extend(relativeTime);
@@ -102,6 +103,17 @@
 		goto(`/waves/${encodeURIComponent(p.id)}${isMock() ? '?mock=1' : ''}`);
 
 	onMount(load);
+
+	// F8/D15:K1 事件驱动重取——orchestration.* 帧(方案开启/波次/任务状态/收口)到达
+	// 即刷新列表,引擎跑完即见;页面在后台只记待办、回前台补取(防后台风暴),3s 节流。
+	onMount(() => {
+		const refresher = createBanyanRefresher(load);
+		const unsubscribe = subscribeBanyanEvents(['orchestration.'], refresher.trigger);
+		return () => {
+			unsubscribe();
+			refresher.dispose();
+		};
+	});
 </script>
 
 <svelte:head><title>{$i18n.t('Waves')} · banyan</title></svelte:head>

@@ -22,6 +22,7 @@ fork 自家 FastAPI 增加 /banyan/api/* 反向代理，把前端五路由与组
   GET  /cards                         语义卡列表
   POST /cards/{id}/resolve            审卡批准/驳回
   GET  /audit                         K1 事件浏览（支持 chat_id/type/limit query）
+  GET  /events                        K1 事件流 SSE 透传（D15/F8，专用端点见下）
   GET  /plans/{plan_id}               方案快照（plan + wave_updates）
   POST /plans/{plan_id}/resolve       方案批准/驳回/选B
   GET  /chats/{chat_id}/tree          会话树
@@ -94,6 +95,87 @@ async def banyan_health(user: Any = Depends(get_verified_user)):
         "auth_mode": "static_token" if BANYAN_TOKEN else "passthrough",
         "engine": {"reachable": engine_ok, "detail": detail},
     }
+
+
+############################
+# SSE events passthrough(F8-K1/D15:变化通知唯一源=引擎 K1 事件流)
+############################
+@router.get("/events")
+async def banyan_events_proxy(
+    request: Request,
+    user: Any = Depends(get_verified_user),
+):
+    """K1 事件流透传:/banyan/api/events → 引擎 GET /api/events。
+
+    引擎帧契约(banyan/human/api.py):hello 帧 {kind:'hello',seq};事件帧
+    {seq,kind,ref,payload};15s keepalive 为注释帧(': keepalive\\n\\n')。
+
+    与 catch-all 的差别只为 SSE 调对参数:
+    - 鉴权:前端走浏览器原生 EventSource(带不了 Authorization 头),fork 侧依赖
+      登录态 token cookie(get_current_user 同源自动携带,auths 落签时 set_cookie);
+      上游鉴权与 catch-all 同款——BANYAN_TOKEN 注入,未设则透传客户端头。
+    - read 超时=None:SSE 是长连,keepalive 之外允许空闲,不为读空闲误杀;
+      客户端断开由 Starlette 取消响应生成器,finally 关上游(断开→上游断开)。
+    - keepalive 注释帧原样透传,不做任何缓冲聚合;显式禁反代缓冲(x-accel-buffering)。
+    """
+    client_authorization = request.headers.get("authorization", "")
+    headers = {
+        key: value
+        for key, value in request.headers.items()
+        if key.lower() not in FORWARD_HEADERS_BLOCKLIST and key.lower() != "authorization"
+    }
+    if BANYAN_TOKEN:
+        headers["Authorization"] = f"Bearer {BANYAN_TOKEN}"
+    elif client_authorization:
+        headers["Authorization"] = client_authorization  # 未设静态 token:透传原头
+    headers.pop("cookie", None)
+
+    client = httpx.AsyncClient(
+        timeout=httpx.Timeout(connect=10.0, read=None, write=30.0, pool=10.0)
+    )
+    upstream_request = client.build_request(
+        "GET",
+        f"{BANYAN_ENGINE_URL}/api/events",
+        params=request.query_params,
+        headers=headers,
+    )
+    try:
+        upstream_response = await client.send(upstream_request, stream=True)
+    except httpx.ConnectError as exc:
+        await client.aclose()
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"banyan engine unreachable at {BANYAN_ENGINE_URL}: {exc}",
+        )
+    except httpx.HTTPError as exc:
+        await client.aclose()
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"banyan engine events request failed: {exc}",
+        )
+
+    response_headers = {
+        key: value
+        for key, value in upstream_response.headers.items()
+        if key.lower() not in RESPONSE_HEADERS_BLOCKLIST
+    }
+    response_headers["cache-control"] = "no-cache"
+    response_headers["x-accel-buffering"] = "no"
+
+    async def stream():
+        try:
+            async for chunk in upstream_response.aiter_bytes():
+                yield chunk
+        finally:
+            await upstream_response.aclose()
+            await client.aclose()
+
+    return StreamingResponse(
+        stream(),
+        status_code=upstream_response.status_code,
+        headers=response_headers,
+        media_type=upstream_response.headers.get("content-type", "text/event-stream"),
+    )
 
 
 ############################

@@ -20,6 +20,7 @@
 	import type { CalendarEventModel, CalendarModel } from '$lib/apis/calendar';
 	import CalendarView from '$lib/components/calendar/CalendarView.svelte';
 	import BanyanPageNav from '$lib/components/banyan/BanyanPageNav.svelte';
+	import { subscribeBanyanEvents, createBanyanRefresher } from '$lib/stores/banyanEvents';
 
 	const i18n = getContext<Writable<i18nType>>('i18n');
 
@@ -276,6 +277,17 @@
 	};
 
 	onMount(load);
+
+	// F8/D15:K1 事件驱动重取——calendar.* 帧(日程开启/增改/取消/提醒)到达即刷新;
+	// 页面在后台只记待办、回前台补取(防后台风暴),3s 节流。
+	onMount(() => {
+		const refresher = createBanyanRefresher(load);
+		const unsubscribe = subscribeBanyanEvents(['calendar.'], refresher.trigger);
+		return () => {
+			unsubscribe();
+			refresher.dispose();
+		};
+	});
 </script>
 
 <svelte:head><title>{$i18n.t('Calendar')} · banyan</title></svelte:head>

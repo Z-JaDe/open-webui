@@ -52,9 +52,12 @@
 
 	const dispatch = createEventDispatcher();
 
-	const DEFAULT_PINNED_ITEMS = ['notes', 'workspace'];
+	// D23:侧栏 Notes 入口摘除——默认与存量 settings 一并过滤'notes'(与 Sidebar 同口径)
+	const DEFAULT_PINNED_ITEMS = ['workspace'];
 
-	$: pinnedItems = $settings?.pinnedMenuItems ?? DEFAULT_PINNED_ITEMS;
+	$: pinnedItems = ($settings?.pinnedMenuItems ?? DEFAULT_PINNED_ITEMS).filter(
+		(id) => id !== 'notes'
+	);
 
 	const isPinned = (id: string) => {
 		return pinnedItems.includes(id);
