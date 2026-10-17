@@ -37,6 +37,7 @@ from open_webui.env import (
     log,
 )
 from open_webui.models.config import Config
+from open_webui.utils import banyan_oauth
 from open_webui.utils.json_codec import JSONCodec
 
 
@@ -2594,13 +2595,16 @@ MICROSOFT_OAUTH_SCOPE = os.getenv('MICROSOFT_OAUTH_SCOPE', 'openid email profile
 
 MICROSOFT_REDIRECT_URI = os.getenv('MICROSOFT_REDIRECT_URI', '')
 
-GITHUB_CLIENT_ID = os.getenv('GITHUB_CLIENT_ID', '')
+# banyan: GitHub OAuth 凭据内置化（FU-3，用户裁决）——默认值来自
+# utils/banyan_oauth.py 的编译期常量（用户自持申请后填入该文件，不进设置页、
+# 不靠 env 手配）；env 仍可覆盖（逃生门，便于测试）。其余 provider 保持 env 原样。
+GITHUB_CLIENT_ID = os.getenv('GITHUB_CLIENT_ID', banyan_oauth.BANYAN_GITHUB_CLIENT_ID)
 
-GITHUB_CLIENT_SECRET = os.getenv('GITHUB_CLIENT_SECRET', '')
+GITHUB_CLIENT_SECRET = os.getenv('GITHUB_CLIENT_SECRET', banyan_oauth.BANYAN_GITHUB_CLIENT_SECRET)
 
-GITHUB_CLIENT_SCOPE = os.getenv('GITHUB_CLIENT_SCOPE', 'user:email')
+GITHUB_CLIENT_SCOPE = os.getenv('GITHUB_CLIENT_SCOPE', banyan_oauth.BANYAN_GITHUB_SCOPE)
 
-GITHUB_CLIENT_REDIRECT_URI = os.getenv('GITHUB_CLIENT_REDIRECT_URI', '')
+GITHUB_CLIENT_REDIRECT_URI = os.getenv('GITHUB_CLIENT_REDIRECT_URI', banyan_oauth.BANYAN_GITHUB_REDIRECT_URI)
 
 OAUTH_CLIENT_ID = os.getenv('OAUTH_CLIENT_ID', '')
 

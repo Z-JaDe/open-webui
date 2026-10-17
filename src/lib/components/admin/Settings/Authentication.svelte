@@ -4,10 +4,8 @@
 		getAdminConfig,
 		getLdapConfig,
 		getLdapServer,
-		getOAuthConfig,
 		updateLdapConfig,
 		updateLdapServer,
-		updateOAuthConfig,
 		updateAdminConfig
 	} from '$lib/apis/auths';
 	import { getGroups } from '$lib/apis/groups';
@@ -48,8 +46,6 @@
 		attribute_for_groups: 'memberOf'
 	};
 
-	let oauthConfig: any = null;
-	$: oauthEditable = oauthConfig?.ENABLE_OAUTH_PERSISTENT_CONFIG ?? true;
 	const inputClass =
 		'w-full h-7 rounded-lg border border-gray-100/50 bg-gray-50/40 px-2 text-xs text-gray-700 outline-hidden transition-colors placeholder:text-gray-300 focus:border-blue-400 dark:border-white/[0.04] dark:bg-white/[0.03] dark:text-gray-300 dark:placeholder:text-gray-700 dark:focus:border-blue-500';
 	const textareaClass =
@@ -74,18 +70,6 @@
 		return !!res;
 	};
 
-	const updateOAuthHandler = async () => {
-		if (!oauthConfig || !oauthEditable) return true;
-		const res = await updateOAuthConfig(localStorage.token, oauthConfig).catch((error) => {
-			toast.error(`${error}`);
-			return null;
-		});
-		if (res) {
-			oauthConfig = res;
-		}
-		return !!res;
-	};
-
 	const updateAdminHandler = async () => {
 		if (!adminConfig) return true;
 		const res = await updateAdminConfig(localStorage.token, adminConfig).catch((error) => {
@@ -105,8 +89,7 @@
 
 	const submitHandler = async () => {
 		const ldapSaved = await updateLdapServerHandler();
-		const oauthSaved = await updateOAuthHandler();
-		if (!ldapSaved || !oauthSaved) return;
+		if (!ldapSaved) return;
 
 		// Save MFA policy last because changing it revokes the current session.
 		const adminSaved = await updateAdminHandler();
@@ -128,9 +111,6 @@
 				// Merge into the defaults so any key the backend omits (e.g. an
 				// older backend without the group settings) keeps its default.
 				LDAP_SERVER = { ...LDAP_SERVER, ...(await getLdapServer(localStorage.token)) };
-			})(),
-			(async () => {
-				oauthConfig = await getOAuthConfig(localStorage.token).catch(() => null);
 			})()
 		]);
 
@@ -579,337 +559,28 @@
 			{/if}
 		</AdminSettingSection>
 
-		{#if oauthConfig}
-			<AdminSettingSection
-				title={$i18n.t('settings.admin.authentication.sections.oauthOidc.title')}
+		<!-- banyan FU-3（用户裁决）：GitHub OAuth 为内置登录，凭据编译于
+			backend/open_webui/utils/banyan_oauth.py（用户自持申请），不作为运行时
+			配置存在——上游的 OAuth/OIDC 配置表单已整体移除，此处只保留说明。 -->
+		<AdminSettingSection title={$i18n.t('settings.admin.authentication.sections.oauthOidc.title')}>
+			<div
+				class="rounded-lg border border-gray-100/50 bg-gray-50/40 px-3 py-2.5 text-xs leading-5 text-gray-600 dark:border-white/[0.04] dark:bg-white/[0.03] dark:text-gray-400"
 			>
-				{#if !oauthEditable}
-					<div
-						class="rounded-lg bg-yellow-500/10 px-2 py-1.5 text-[0.6875rem] text-yellow-700 dark:text-yellow-200"
-					>
-						{$i18n.t(
-							'These settings are read from environment variables and cannot be edited here while {{ENV_VAR}} is disabled.',
-							{ ENV_VAR: 'ENABLE_OAUTH_PERSISTENT_CONFIG' }
-						)}
-					</div>
-				{/if}
-
-				<fieldset
-					class="flex min-w-0 flex-col gap-2.5 disabled:cursor-not-allowed disabled:opacity-75"
-					disabled={!oauthEditable}
-				>
-					<AdminSettingRow
-						label={$i18n.t('settings.admin.authentication.oauthOidc.label')}
-						description={$i18n.t('settings.admin.authentication.oauthOidc.description')}
-						let:labelId
-					>
-						<Switch bind:state={oauthConfig.ENABLE_OAUTH} ariaLabelledbyId={labelId} />
-					</AdminSettingRow>
-
-					{#if oauthConfig.ENABLE_OAUTH}
-						<div class="grid grid-cols-1 gap-x-3 gap-y-2.5 sm:grid-cols-2">
-							<AdminSettingField
-								label={$i18n.t('settings.admin.authentication.providerName.label')}
-								description={$i18n.t('settings.admin.authentication.providerName.description')}
-							>
-								<input
-									class={inputClass}
-									placeholder="SSO"
-									bind:value={oauthConfig.OAUTH_PROVIDER_NAME}
-								/>
-							</AdminSettingField>
-
-							<AdminSettingField
-								label={$i18n.t('settings.admin.authentication.providerUrl.label')}
-								description={$i18n.t('settings.admin.authentication.providerUrl.description')}
-							>
-								<input
-									class={inputClass}
-									placeholder="https://accounts.google.com/.well-known/openid-configuration"
-									bind:value={oauthConfig.OPENID_PROVIDER_URL}
-								/>
-							</AdminSettingField>
-						</div>
-
-						<div class="grid grid-cols-1 gap-x-3 gap-y-2.5 sm:grid-cols-2">
-							<AdminSettingField
-								label={$i18n.t('settings.admin.authentication.clientId.label')}
-								description={$i18n.t('settings.admin.authentication.clientId.description')}
-							>
-								<input
-									class={inputClass}
-									placeholder={$i18n.t('Enter Client ID')}
-									bind:value={oauthConfig.OAUTH_CLIENT_ID}
-								/>
-							</AdminSettingField>
-
-							<AdminSettingField
-								label={$i18n.t('settings.admin.authentication.clientSecret.label')}
-								description={$i18n.t('settings.admin.authentication.clientSecret.description')}
-							>
-								<SensitiveInput
-									variant="settings"
-									placeholder={$i18n.t('Enter Client Secret')}
-									required={false}
-									bind:value={oauthConfig.OAUTH_CLIENT_SECRET}
-								/>
-							</AdminSettingField>
-						</div>
-
-						<div class="grid grid-cols-1 gap-x-3 gap-y-2.5 sm:grid-cols-2">
-							<AdminSettingField
-								label={$i18n.t('settings.admin.authentication.redirectUri.label')}
-								description={$i18n.t('settings.admin.authentication.redirectUri.description')}
-							>
-								<input
-									class={inputClass}
-									placeholder={$i18n.t('Enter Redirect URI')}
-									bind:value={oauthConfig.OPENID_REDIRECT_URI}
-								/>
-							</AdminSettingField>
-
-							<AdminSettingField
-								label={$i18n.t('settings.admin.authentication.scopes.label')}
-								description={$i18n.t('settings.admin.authentication.scopes.description')}
-							>
-								<input
-									class={inputClass}
-									placeholder="openid email profile"
-									bind:value={oauthConfig.OAUTH_SCOPES}
-								/>
-							</AdminSettingField>
-						</div>
-
-						<div class="grid grid-cols-1 gap-x-3 gap-y-2.5 sm:grid-cols-2">
-							<AdminSettingField
-								label={$i18n.t('settings.admin.authentication.emailClaim.label')}
-								description={$i18n.t('settings.admin.authentication.emailClaim.description')}
-							>
-								<input
-									class={inputClass}
-									placeholder="email"
-									bind:value={oauthConfig.OAUTH_EMAIL_CLAIM}
-								/>
-							</AdminSettingField>
-
-							<AdminSettingField
-								label={$i18n.t('settings.admin.authentication.usernameClaim.label')}
-								description={$i18n.t('settings.admin.authentication.usernameClaim.description')}
-							>
-								<input
-									class={inputClass}
-									placeholder="name"
-									bind:value={oauthConfig.OAUTH_USERNAME_CLAIM}
-								/>
-							</AdminSettingField>
-						</div>
-
-						<div class="grid grid-cols-1 gap-x-3 gap-y-2.5 sm:grid-cols-2">
-							<AdminSettingField
-								label={$i18n.t('settings.admin.authentication.pictureClaim.label')}
-								description={$i18n.t('settings.admin.authentication.pictureClaim.description')}
-							>
-								<input
-									class={inputClass}
-									placeholder="picture"
-									bind:value={oauthConfig.OAUTH_PICTURE_CLAIM}
-								/>
-							</AdminSettingField>
-
-							<AdminSettingField
-								label={$i18n.t('settings.admin.authentication.subClaim.label')}
-								description={$i18n.t('settings.admin.authentication.subClaim.description')}
-							>
-								<input
-									class={inputClass}
-									placeholder="sub"
-									bind:value={oauthConfig.OAUTH_SUB_CLAIM}
-								/>
-							</AdminSettingField>
-						</div>
-
-						<AdminSettingRow
-							label={$i18n.t('settings.admin.authentication.oauthSignup.label')}
-							description={$i18n.t('settings.admin.authentication.oauthSignup.description')}
-							let:labelId
-						>
-							<Switch bind:state={oauthConfig.ENABLE_OAUTH_SIGNUP} ariaLabelledbyId={labelId} />
-						</AdminSettingRow>
-
-						<AdminSettingRow
-							label={$i18n.t('settings.admin.authentication.mergeAccountsByEmail.label')}
-							description={$i18n.t(
-								'settings.admin.authentication.mergeAccountsByEmail.description'
-							)}
-							let:labelId
-						>
-							<Switch
-								bind:state={oauthConfig.OAUTH_MERGE_ACCOUNTS_BY_EMAIL}
-								ariaLabelledbyId={labelId}
-							/>
-						</AdminSettingRow>
-
-						<AdminSettingRow
-							label={$i18n.t('settings.admin.authentication.autoRedirect.label')}
-							description={$i18n.t('settings.admin.authentication.autoRedirect.description')}
-							let:labelId
-						>
-							<Switch bind:state={oauthConfig.OAUTH_AUTO_REDIRECT} ariaLabelledbyId={labelId} />
-						</AdminSettingRow>
-
-						<AdminSettingField
-							label={$i18n.t('settings.admin.authentication.allowedDomains.label')}
-							description={$i18n.t('settings.admin.authentication.allowedDomains.description')}
-						>
-							<input
-								class={inputClass}
-								placeholder={$i18n.t('* (all domains)')}
-								bind:value={oauthConfig.OAUTH_ALLOWED_DOMAINS}
-							/>
-						</AdminSettingField>
-
-						<!-- LICENSE covers this Open WebUI wordmark.
-						Do not alter, remove, obscure, or replace it except as LICENSE permits:
-						https://docs.openwebui.com/license. -->
-						<AdminSettingRow
-							label={$i18n.t('settings.admin.authentication.roleMapping.label')}
-							description={$i18n.t('settings.admin.authentication.roleMapping.description')}
-							let:labelId
-						>
-							<Switch
-								bind:state={oauthConfig.ENABLE_OAUTH_ROLE_MANAGEMENT}
-								ariaLabelledbyId={labelId}
-							/>
-						</AdminSettingRow>
-
-						{#if oauthConfig.ENABLE_OAUTH_ROLE_MANAGEMENT}
-							<div class="grid grid-cols-1 gap-x-3 gap-y-2.5 sm:grid-cols-2">
-								<AdminSettingField
-									label={$i18n.t('settings.admin.authentication.rolesClaim.label')}
-									description={$i18n.t('settings.admin.authentication.rolesClaim.description')}
-								>
-									<input
-										class={inputClass}
-										placeholder="roles"
-										bind:value={oauthConfig.OAUTH_ROLES_CLAIM}
-									/>
-								</AdminSettingField>
-
-								<AdminSettingField
-									label={$i18n.t('settings.admin.authentication.adminRoles.label')}
-									description={$i18n.t('settings.admin.authentication.adminRoles.description')}
-								>
-									<input
-										class={inputClass}
-										placeholder="admin"
-										bind:value={oauthConfig.OAUTH_ADMIN_ROLES}
-									/>
-								</AdminSettingField>
-							</div>
-
-							<AdminSettingField
-								label={$i18n.t('settings.admin.authentication.allowedRoles.label')}
-								description={$i18n.t('settings.admin.authentication.allowedRoles.description')}
-							>
-								<input
-									class={inputClass}
-									placeholder="*"
-									bind:value={oauthConfig.OAUTH_ALLOWED_ROLES}
-								/>
-							</AdminSettingField>
-						{/if}
-
-						<!-- LICENSE covers this Open WebUI wordmark.
-						Do not alter, remove, obscure, or replace it except as LICENSE permits:
-						https://docs.openwebui.com/license. -->
-						<AdminSettingRow
-							label={$i18n.t('settings.admin.authentication.enableOauthGroupManagement.label')}
-							description={$i18n.t(
-								'settings.admin.authentication.enableOauthGroupManagement.description'
-							)}
-							let:labelId
-						>
-							<Switch
-								bind:state={oauthConfig.ENABLE_OAUTH_GROUP_MANAGEMENT}
-								ariaLabelledbyId={labelId}
-							/>
-						</AdminSettingRow>
-
-						{#if oauthConfig.ENABLE_OAUTH_GROUP_MANAGEMENT}
-							<AdminSettingRow
-								label={$i18n.t('settings.admin.authentication.enableOauthGroupCreation.label')}
-								description={$i18n.t(
-									'settings.admin.authentication.enableOauthGroupCreation.description'
-								)}
-								let:labelId
-							>
-								<Switch
-									bind:state={oauthConfig.ENABLE_OAUTH_GROUP_CREATION}
-									ariaLabelledbyId={labelId}
-								/>
-							</AdminSettingRow>
-
-							<div class="grid grid-cols-1 gap-x-3 gap-y-2.5 sm:grid-cols-2">
-								<AdminSettingField
-									label={$i18n.t('settings.admin.authentication.groupClaim.label')}
-									description={$i18n.t('settings.admin.authentication.groupClaim.description')}
-								>
-									<input
-										class={inputClass}
-										placeholder="groups"
-										bind:value={oauthConfig.OAUTH_GROUP_CLAIM}
-									/>
-								</AdminSettingField>
-
-								<AdminSettingField
-									label={$i18n.t('settings.admin.authentication.blockedGroups.label')}
-									description={$i18n.t('settings.admin.authentication.blockedGroups.description')}
-								>
-									<input
-										class={inputClass}
-										placeholder={$i18n.t('Comma-separated group names')}
-										bind:value={oauthConfig.OAUTH_BLOCKED_GROUPS}
-									/>
-								</AdminSettingField>
-							</div>
-						{/if}
-
-						<AdminSettingRow
-							label={$i18n.t('settings.admin.authentication.updateEmail.label')}
-							description={$i18n.t('settings.admin.authentication.updateEmail.description')}
-							let:labelId
-						>
-							<Switch
-								bind:state={oauthConfig.OAUTH_UPDATE_EMAIL_ON_LOGIN}
-								ariaLabelledbyId={labelId}
-							/>
-						</AdminSettingRow>
-
-						<AdminSettingRow
-							label={$i18n.t('settings.admin.authentication.updateName.label')}
-							description={$i18n.t('settings.admin.authentication.updateName.description')}
-							let:labelId
-						>
-							<Switch
-								bind:state={oauthConfig.OAUTH_UPDATE_NAME_ON_LOGIN}
-								ariaLabelledbyId={labelId}
-							/>
-						</AdminSettingRow>
-
-						<AdminSettingRow
-							label={$i18n.t('settings.admin.authentication.updatePicture.label')}
-							description={$i18n.t('settings.admin.authentication.updatePicture.description')}
-							let:labelId
-						>
-							<Switch
-								bind:state={oauthConfig.OAUTH_UPDATE_PICTURE_ON_LOGIN}
-								ariaLabelledbyId={labelId}
-							/>
-						</AdminSettingRow>
-					{/if}
-				</fieldset>
-			</AdminSettingSection>
-		{/if}
+				<p class="font-medium text-gray-700 dark:text-gray-300">
+					{$i18n.t('GitHub OAuth is built into banyan and requires no configuration here.')}
+				</p>
+				<p>
+					{$i18n(
+						'Credentials are compiled into backend/open_webui/utils/banyan_oauth.py (apply for your own GitHub OAuth App, then edit that file and restart). The callback URL to register on GitHub is https://&lt;your-domain&gt;/oauth/github/login/callback'
+					)}
+				</p>
+				<p>
+					{$i18n(
+						'Leave the credentials empty and the GitHub sign-in button simply stays hidden; all other settings on this page keep working as usual.'
+					)}
+				</p>
+			</div>
+		</AdminSettingSection>
 	</div>
 
 	<div class="flex justify-end pt-6 text-sm font-normal">

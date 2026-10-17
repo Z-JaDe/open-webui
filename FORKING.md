@@ -41,7 +41,10 @@
 | `backend/open_webui/routers/openai.py` | 三处：流式转发包 `banyan_passthrough_wrapper` + 非流式 `strip_banyan_sse_lines`（§2 透传链路）+ conv 头注入（§3b，均在 `generate_chat_completion` 内，登记在案） |
 | `backend/open_webui/routers/chats.py` | 两处（§3b quick-win）：`update_chat_by_id` 改名→引擎 title 同步；`delete_chat_by_id` 删除→引擎归档（登记在案） |
 | `backend/open_webui/models/chats.py` | 一个方法：`update_chat_meta_by_id`（conv 绑定持久化用，登记在案） |
-| `backend/open_webui/utils/banyan_stream.py`、`banyan_conv.py`、`backend/tests/` | 透传/conv 绑定实现与单测 |
+| `backend/open_webui/utils/banyan_stream.py`、`banyan_conv.py`、`banyan_oauth.py`、`backend/tests/` | 透传/conv 绑定/GitHub OAuth 内置凭据（§3d）实现与单测 |
+| `backend/open_webui/config.py` | §3d 一处：`GITHUB_*` 四变量默认值改读 `utils/banyan_oauth`（env 仍可覆盖；登记在案） |
+| `src/lib/components/admin/Settings/Authentication.svelte` | §3d：OAuth 配置表单区块整体移除，换说明文字；signup 开关保留（登记在案） |
+| `src/lib/i18n/locales/zh-CN/translation.json` | §3d：三条 GitHub OAuth 说明 i18n 键（登记在案） |
 
 ---
 
@@ -163,7 +166,7 @@ meta，随后注入 `X-Banyan-Conv` 头（引擎 `_resolve_conv` 头优先）。
 `docs/goal/功能适配审计.md`）：
 
 ```bash
-ENABLE_SIGNUP=false
+ENABLE_SIGNUP=true                 # FU-3 [用户裁决] signup 重开；DB 行存在时以 DB 为准
 ENABLE_OLLAMA_API=false
 ENABLE_DIRECT_CONNECTIONS=false
 ENABLE_TOOL_SERVERS=false        # 连带 terminals 关闭
@@ -197,6 +200,49 @@ ENABLE_ADMIN_ANALYTICS=false
 
 ---
 
+## 3d. GitHub OAuth 内置化（FU-3，用户裁决）
+
+**裁决**：GitHub OAuth 需要，但凭据用户自持申请、**不作为运行时配置存在**——
+不进设置页、不靠 env 手配；signup 重开。
+
+**实现**（对上游的侵入仅两处，登记进 §1 表）：
+- `backend/open_webui/utils/banyan_oauth.py`（新文件）：内置凭据常量
+  `BANYAN_GITHUB_CLIENT_ID / _CLIENT_SECRET / _REDIRECT_URI / _SCOPE`，
+  初值留空占位。**这是唯一填写处**。该模块刻意零 import（config.py 会引它，
+  引依赖即循环导入）。
+- `backend/open_webui/config.py`：`GITHUB_*` 四变量默认值从 `banyan_oauth`
+  读（env 仍可覆盖）。其余 provider（google/microsoft/oidc）保持 env 原样、
+  默认不启用。
+- `src/lib/components/admin/Settings/Authentication.svelte`：OAuth 配置表单
+  区块整体移除，替换为说明文字（zh-CN 三条 i18n 键，加在
+  `zh-CN/translation.json`）；signup 开关保留。
+
+**用户申请步骤**（GitHub OAuth App）：
+1. GitHub → Settings → Developer settings → OAuth Apps → New OAuth App；
+2. Homepage URL：`https://<部署域名>/`；Authorization callback URL：
+   `https://<部署域名>/oauth/github/login/callback`
+   （后端路由 `GET /oauth/{provider}/login/callback`；`BANYAN_GITHUB_REDIRECT_URI`
+   留空时按请求自动推导该地址，二者一致即可。反代/内外网域名不一致才需显式
+   填 REDIRECT_URI，且必须与 GitHub 登记值完全一致）；
+3. 创建后复制 Client ID，"Generate a new client secret" 复制 Secret（只显示
+   一次），填入 `banyan_oauth.py` 两个常量，重启后端。登录页自动出现 GitHub
+   按钮（`$config.oauth.providers` 驱动，前端零改动）。
+
+**行为**：凭据未填 → provider 不装配、登录页无 GitHub 按钮、启动无报错（已验证）。
+填好后启动会出现上游的 logout 警告（`OAuth providers configured (GitHub) but
+OPENID_PROVIDER_URL not set`）——GitHub 无 OIDC end-session 端点，本地会话登出
+不受影响，可忽略。
+
+**逃生门**（测试用）：env `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` /
+`GITHUB_CLIENT_REDIRECT_URI` / `GITHUB_CLIENT_SCOPE` 优先于内置常量（已验证
+env 覆盖生效）。
+
+**signup 重开**：DB `config` 表 `ui.enable_signup=true`（运行库已写入；注意
+上游行为——首个注册用户成为 admin 时会自动把该键写回 false，此后不再触发）；
+启动脚本 env `ENABLE_SIGNUP=true`（新库种子/缺省回退，DB 行存在时以 DB 为准）。
+
+---
+
 ## 4. mock / story 开关
 
 无法真连引擎时：
@@ -216,8 +262,10 @@ git fetch upstream --tags
 # 1) 从上游主分支开合并分支
 git checkout -b upstream-merge-YYYYQX banyan
 git merge --no-ff upstream/main
-#    预期冲突面 = §1 钩点清单中的 7 个文件（Chat.svelte / ResponseMessage.svelte /
-#    Sidebar.svelte / main.py / openai.py / chats.py / models/chats.py）。逐一手工核对：
+#    预期冲突面 = §1 钩点清单中的 11 个文件（Chat.svelte / ResponseMessage.svelte /
+#    Sidebar.svelte / main.py / openai.py / chats.py / models/chats.py /
+#    config.py / Authentication.svelte / zh-CN translation.json /
+#    utils/banyan_*.py）。逐一手工核对：
 #    - Chat.svelte：确认 banyan 分支仍在事件分发链上、loadChat 恢复逻辑仍在；
 #    - ResponseMessage.svelte：确认 BanyanEvents 挂载点仍在正文上方；
 #    - Sidebar.svelte：确认任务分区仍在；
@@ -227,6 +275,9 @@ git merge --no-ff upstream/main
 #    - chats.py：确认 update_chat_by_id 的改名同步与 delete_chat_by_id 的
 #      归档钩子（conv_id_for_chat / patch_engine_session）仍在；
 #    - models/chats.py：确认 update_chat_meta_by_id 仍在。
+#    - config.py：确认 GITHUB_* 四变量默认值仍读 banyan_oauth（§3d）；
+#    - Authentication.svelte：确认 OAuth 表单仍被说明文字取代、signup 开关仍在；
+#    - zh-CN translation.json：确认三条 GitHub OAuth 说明键仍在。
 
 # 2) 回归验证
 npm ci && npm run build          # 前端全绿
