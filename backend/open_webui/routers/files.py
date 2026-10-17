@@ -288,6 +288,8 @@ async def upload_file(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    # 主上传端点=对话附件路径:banyan 附件归引擎(D18/F9)的转发入口
+    # (models/images/retrieval 等共用 handler 的内部上传不转发)
     result = await upload_file_handler(
         request,
         file=file,
@@ -297,6 +299,7 @@ async def upload_file(
         user=user,
         background_tasks=background_tasks,
         db=db,
+        engine_bridge=True,
     )
 
     if isinstance(result, dict):
@@ -330,6 +333,7 @@ async def upload_file_handler(
     user=Depends(get_verified_user),
     background_tasks: Optional[BackgroundTasks] = None,
     db: Optional[AsyncSession] = None,
+    engine_bridge: bool = False,
 ):
     log.info('file.content_type: %s %s', file.content_type, process)
 
@@ -405,6 +409,20 @@ async def upload_file_handler(
             lambda: hashlib.sha256(contents).hexdigest()
         )
 
+        # banyan 附件归引擎(D18/F9,RF-12):主上传端点的对话附件同步转发引擎
+        # 工作区(附件唯一正本,编排工人可直读)。失败降级=原行为(本地缓存行
+        # 照常落库作为会话渲染引用)+警告日志,绝不阻断上传;engine_path 记入
+        # file.meta,对话轮由 utils/banyan_attach.apply_banyan_engine_payload 携带。
+        engine_path = None
+        if engine_bridge:
+            from open_webui.utils.banyan_attach import forward_attachment_to_engine
+
+            engine_path = await forward_attachment_to_engine(
+                name,
+                contents,
+                file.content_type if isinstance(file.content_type, str) else None,
+            )
+
         file_item = await Files.insert_new_file(
             user.id,
             FileForm(
@@ -421,6 +439,7 @@ async def upload_file_handler(
                         'size': len(contents),
                         'file_hash': file_hash,
                         'data': file_metadata,
+                        **({'engine_path': engine_path} if engine_path else {}),
                     },
                 }
             ),

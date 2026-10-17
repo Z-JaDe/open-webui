@@ -86,6 +86,7 @@ from open_webui.utils.access_control import has_permission
 from open_webui.utils.access_control.files import get_owner_accessible_folder_files
 from open_webui.utils.access_control.folders import has_folder_access
 from open_webui.utils.ask_user import stage_ask_user_tool_calls
+from open_webui.utils.banyan_attach import apply_banyan_engine_payload, is_banyan_model
 from open_webui.utils.chat import generate_chat_completion
 from open_webui.utils.chat_id import is_saved_chat_id
 from open_webui.utils.code_interpreter import execute_code_jupyter
@@ -2433,6 +2434,11 @@ async def process_chat_payload(request, form_data, user, metadata, model):
             form_data['model'] = selected_model_id
             metadata['selected_model_id'] = selected_model_id
 
+    # banyan 引擎档位判定(D18/D19/D20,helper=utils/banyan_attach):一次判定,
+    # 三处共用——附件携带/多模态剥离、chroma RAG 短路、memory 强制关。
+    # (置于 arena 子模型消解之后:判定对象=最终供数模型)
+    banyan_model = is_banyan_model(model, form_data.get('model'))
+
     # Keep the template before apply_params_to_form_data consumes the model parameters.
     model_system_prompt_template = (form_data.get('params') or {}).get('system')
 
@@ -2701,6 +2707,10 @@ async def process_chat_payload(request, form_data, user, metadata, model):
             raise Exception(f'{e}')
 
     features = form_data.pop('features', None) or {}
+    if banyan_model:
+        # D20 记忆归引擎:banyan 模型强制关 fork memory 层("关于主人的事"=
+        # 引擎知识素材,第二人格记忆层封禁;client 供的 features.memory 不可信)
+        features['memory'] = False
     extra_params['__features__'] = features
     if features:
         if 'voice' in features and features['voice']:
@@ -3019,6 +3029,18 @@ async def process_chat_payload(request, form_data, user, metadata, model):
     )
     form_data['metadata'] = metadata
 
+    if banyan_model:
+        # D18 附件归引擎·会话轮携带(单点 helper=utils/banyan_attach):
+        # ① 剥 user 消息多模态 base64 段(image 段不进 payload);② file.meta 有
+        # engine_path 在案的上传桥附件→文本行追加进最后一条 user 文本——引擎
+        # _last_user_text 只读文本,工人按行内 workspace 相对路径直读正本。
+        gate = apply_banyan_engine_payload(form_data, metadata)
+        if gate['stripped'] or gate['attached']:
+            log.info(
+                'banyan_attach: 引擎轮携带(D18) model=%s stripped=%s attached=%s',
+                form_data.get('model'), gate['stripped'], gate['attached'],
+            )
+
     # When the caller provides an explicit `tools` key in the request body,
     # skip all server-side tool resolution and pass the caller's tools through
     # unchanged.  Sending `tools: []` explicitly opts out of builtin injection.
@@ -3313,7 +3335,10 @@ async def process_chat_payload(request, form_data, user, metadata, model):
     # Check if file context extraction is enabled for this model (default True)
     file_context_enabled = (model.get('info', {}).get('meta', {}).get('capabilities') or {}).get('file_context', True)
 
-    if file_context_enabled:
+    if file_context_enabled and not banyan_model:
+        # D19 知识单一链:banyan 模型对 fork chroma RAG 整体短路(检索与
+        # rag_template 注入都不发生——fork 库文档绕过引擎入审/攻击门/K2 是
+        # 纪律后门;文档链唯一入口=引擎入库,附件经引擎工作区携带)
         try:
             form_data, flags = await chat_completion_files_handler(request, form_data, extra_params, user)
             sources.extend(flags.get('sources', []))
