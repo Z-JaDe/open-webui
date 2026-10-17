@@ -1,17 +1,7 @@
 <script>
-	import { onMount } from 'svelte';
-	import { goto } from '$app/navigation';
-	import { config } from '$lib/stores';
-
-	import Tools from '$lib/components/workspace/Tools.svelte';
-
-	onMount(() => {
-		if (!$config?.features?.enable_tools) {
-			goto('/workspace', { replaceState: true });
-		}
-	});
+	// banyan D24/D19（完整方案 §12.5）：此面退役（fork 业务配置/知识正本归引擎）。
+	// 路由文件保留，原页面组件换为退役占位（恢复=换回原组件，见 git 历史）。
+	import FeatureRetired from '$lib/components/common/FeatureRetired.svelte';
 </script>
 
-{#if $config?.features?.enable_tools}
-	<Tools />
-{/if}
+<FeatureRetired code="D24" />

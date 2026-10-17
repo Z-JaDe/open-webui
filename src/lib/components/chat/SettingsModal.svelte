@@ -6,6 +6,7 @@
 		type SettingsTab
 	} from '$lib/utils/settings-search';
 	import { browser } from '$app/environment';
+	import { goto } from '$app/navigation';
 	import { getContext, tick } from 'svelte';
 	import type { Writable } from 'svelte/store';
 	import { toast } from 'svelte-sonner';
@@ -31,7 +32,6 @@
 	import SettingsAlt from '../icons/SettingsAlt.svelte';
 	import Link from '../icons/Link.svelte';
 	import UserCircle from '../icons/UserCircle.svelte';
-	import SoundHigh from '../icons/SoundHigh.svelte';
 	import InfoCircle from '../icons/InfoCircle.svelte';
 	import WrenchAlt from '../icons/WrenchAlt.svelte';
 	import Face from '../icons/Face.svelte';
@@ -45,12 +45,15 @@
 	import AdminGeneral from '$lib/components/admin/Settings/General.svelte';
 	import AdminAuthentication from '$lib/components/admin/Settings/Authentication.svelte';
 	import AdminConnections from '$lib/components/admin/Settings/Connections.svelte';
-				import AdminAnalytics from '$lib/components/admin/Analytics.svelte';
-			import AdminDocuments from '$lib/components/admin/Settings/Documents.svelte';
-			import AdminInterface from '$lib/components/admin/Settings/Interface.svelte';
-				import AdminDatabase from '$lib/components/admin/Settings/Database.svelte';
-	// banyan（hook④，V-10 W4）：admin:connections 分支换引擎只读状态卡（BanyanEngineStatus）
-	import AdminBanyanEngineStatus from '$lib/components/admin/BanyanEngineStatus.svelte';
+	import AdminInterface from '$lib/components/admin/Settings/Interface.svelte';
+	import AdminDatabase from '$lib/components/admin/Settings/Database.svelte';
+	// banyan（D4/F5）：引擎状态卡已迁 /arch 架构页（登录可见，无 admin 依赖 D11；
+	// 设置是配置心智、架构页是状态心智）——admin:connections 分支改轻量指向卡
+	// （BanyanEngineStatus 组件本体在 /arch 复用，此处不再引入）。
+	// banyan F6（完整方案 §10）：Web 搜索 tab 裁到单引擎后保留（组件按原结构裁剪重建）
+	import AdminWebSearch from '$lib/components/admin/Settings/WebSearch.svelte';
+	// banyan F6：个人区 tools tab（直连工具服务器）组件保留，补回缺失 import（修复断链）
+	import Integrations from './Settings/Integrations.svelte';
 
 	const i18n: Writable<any> = getContext('i18n');
 
@@ -146,23 +149,15 @@
 		about: $i18n.t('Profile')
 	};
 	// $i18n.t('Experience');
+	// banyan F6（完整方案 §10）：admin 17 tab→6 tab（通用/认证/界面/引擎指向卡/Web 搜索/数据库）；
+	// 被裁 tab 的组件已在前轮退役（Audio/Images/CodeExecution/Pipelines/Evaluations/Models/
+	// Subagents/Integrations/Apps 十退役 + Documents 随 fork RAG 退役），行与分支一并摘除。
 	$: adminSettingGroups = {
 		'admin:general': $i18n.t('System'),
 		'admin:authentication': $i18n.t('System'),
 		'admin:interface': $i18n.t('System'),
 		'admin:connections': $i18n.t('AI'),
-		'admin:models': $i18n.t('AI'),
-		'admin:subagents': $i18n.t('AI'),
-		'admin:integrations': $i18n.t('Tools'),
-		'admin:apps': $i18n.t('Tools'),
-		'admin:documents': $i18n.t('Tools'),
-		'admin:audio': $i18n.t('Tools'),
-		'admin:images': $i18n.t('Tools'),
 		'admin:web': $i18n.t('Tools'),
-		'admin:code-execution': $i18n.t('Tools'),
-		'admin:pipelines': $i18n.t('Tools'),
-		'admin:evaluations': $i18n.t('Quality'),
-		'admin:analytics': $i18n.t('Quality'),
 		'admin:db': $i18n.t('Data')
 	};
 	const settingGroupTitle = (tabId: string) =>
@@ -219,12 +214,7 @@
 			title: $i18n.t('settings.personal.personalization.title'),
 			searchPrefixes: ['settings.personal.personalization.']
 		},
-		{
-			id: 'audio',
-			titleKey: 'settings.personal.audio.title',
-			title: $i18n.t('settings.personal.audio.title'),
-			searchPrefixes: ['settings.personal.audio.']
-		},
+		// banyan F6（设置页方案 §一）：个人区"语音"随音频域退役隐藏（组件文件保留，恢复=重新注册一行）
 		{
 			id: 'data_controls',
 			titleKey: 'settings.personal.dataControls.title',
@@ -257,6 +247,7 @@
 		}
 	];
 	let adminSettings: SettingsTab[];
+	// banyan F6（完整方案 §10）：17→6 收敛；admin:connections 保留 tab 行（引擎指向卡，RF-13 接手指向卡形态）
 	$: adminSettings = [
 		{
 			id: 'admin:general',
@@ -285,76 +276,10 @@
 			searchPrefixes: []
 		},
 		{
-			id: 'admin:models',
-			titleKey: 'settings.admin.models.title',
-			title: $i18n.t('settings.admin.models.title'),
-			searchPrefixes: ['settings.admin.models.', 'settings.personal.general.parameters.']
-		},
-		{
-			id: 'admin:subagents',
-			titleKey: 'settings.admin.subagents.title',
-			title: $i18n.t('settings.admin.subagents.title'),
-			searchPrefixes: ['settings.admin.subagents.']
-		},
-		{
-			id: 'admin:integrations',
-			titleKey: 'settings.admin.integrations.title',
-			title: $i18n.t('settings.admin.integrations.title'),
-			searchPrefixes: ['settings.admin.integrations.']
-		},
-		{
-			id: 'admin:apps',
-			titleKey: 'Apps',
-			title: $i18n.t('Apps'),
-			searchPrefixes: []
-		},
-		{
-			id: 'admin:documents',
-			titleKey: 'settings.admin.documents.title',
-			title: $i18n.t('settings.admin.documents.title'),
-			searchPrefixes: ['settings.admin.documents.']
-		},
-		{
-			id: 'admin:audio',
-			titleKey: 'settings.admin.audio.title',
-			title: $i18n.t('settings.admin.audio.title'),
-			searchPrefixes: ['settings.admin.audio.']
-		},
-		{
-			id: 'admin:images',
-			titleKey: 'settings.admin.images.title',
-			title: $i18n.t('settings.admin.images.title'),
-			searchPrefixes: ['settings.admin.images.']
-		},
-		{
 			id: 'admin:web',
 			titleKey: 'settings.admin.web.title',
 			title: $i18n.t('settings.admin.web.title'),
 			searchPrefixes: ['settings.admin.web.']
-		},
-		{
-			id: 'admin:code-execution',
-			titleKey: 'settings.admin.codeExecution.title',
-			title: $i18n.t('settings.admin.codeExecution.title'),
-			searchPrefixes: ['settings.admin.codeExecution.']
-		},
-		{
-			id: 'admin:pipelines',
-			titleKey: 'settings.admin.pipelines.title',
-			title: $i18n.t('settings.admin.pipelines.title'),
-			searchPrefixes: ['settings.admin.pipelines.']
-		},
-		{
-			id: 'admin:analytics',
-			titleKey: 'settings.admin.analytics.title',
-			title: $i18n.t('settings.admin.analytics.title'),
-			searchPrefixes: ['settings.admin.analytics.']
-		},
-		{
-			id: 'admin:evaluations',
-			titleKey: 'settings.admin.evaluations.title',
-			title: $i18n.t('settings.admin.evaluations.title'),
-			searchPrefixes: ['settings.admin.evaluations.']
 		},
 		{
 			id: 'admin:db',
@@ -407,10 +332,6 @@
 
 		return (
 			$user?.role === 'admin' ? [...personalSettings, ...administratorTabs] : personalSettings
-		).filter(
-			(tab) =>
-				(tab.id !== 'admin:analytics' || ($config?.features?.enable_admin_analytics ?? true)) &&
-				(tab.id !== 'admin:apps' || $config?.features?.enable_apps)
 		);
 	};
 
@@ -666,19 +587,6 @@
 							<Face className="size-3.5" strokeWidth="2" />
 							<span>{$i18n.t('settings.personal.personalization.title')}</span>
 						</button>
-					{:else if tabId === 'audio'}
-						<button
-							role="tab"
-							aria-controls="tab-audio"
-							aria-selected={selectedTab === 'audio'}
-							class={tabButtonClass(selectedTab === 'audio')}
-							on:click={() => {
-								selectTab('audio');
-							}}
-						>
-							<SoundHigh className="size-3.5" strokeWidth="2" />
-							<span>{$i18n.t('settings.personal.audio.title')}</span>
-						</button>
 					{:else if tabId === 'data_controls'}
 						<button
 							role="tab"
@@ -825,90 +733,67 @@
 						toast.success($i18n.t('Settings saved successfully!'));
 					}}
 				/>
-			{:else if selectedTab === 'personalization'}
-				<Personalization
-					{saveSettings}
-					on:save={() => {
-						toast.success($i18n.t('Settings saved successfully!'));
-					}}
-				/>
-			{:else if selectedTab === 'audio'}
-				<Audio
-					{saveSettings}
-					on:save={() => {
-						toast.success($i18n.t('Settings saved successfully!'));
-					}}
-				/>
-			{:else if selectedTab === 'data_controls'}
-				<DataControls {saveSettings} />
-			{:else if selectedTab === 'usage'}
-				<Usage />
-			{:else if selectedTab === 'archived_chats'}
-				<ArchivedChats />
-			{:else if selectedTab === 'account'}
-				<Account
-					saveHandler={() => {
-						toast.success($i18n.t('Settings saved successfully!'));
-					}}
-				/>
-			{:else if selectedTab === 'about'}
-				<About />
-			{:else if selectedTab === 'admin:general'}
-				<AdminGeneral saveHandler={adminConfigSaveHandler} />
-			{:else if selectedTab === 'admin:authentication'}
-				<AdminAuthentication />
-			{:else if selectedTab === 'admin:connections'}
-				<!-- hook④（V-10 W4）：分支换 BanyanEngineStatus 只读状态卡（tab 行保留，不删） -->
-				<AdminBanyanEngineStatus />
-			{:else if selectedTab === 'admin:models'}
-				<AdminModels bind:tabState />
-			{:else if selectedTab === 'admin:subagents'}
-				<AdminSubagents />
-			{:else if selectedTab === 'admin:evaluations'}
-				<AdminEvaluations />
-			{:else if selectedTab === 'admin:analytics'}
-				<AdminAnalytics />
-			{:else if selectedTab === 'admin:integrations'}
-				<AdminIntegrations {saveSettings} />
-			{:else if selectedTab === 'admin:apps'}
-				<AdminApps />
-			{:else if selectedTab === 'admin:documents'}
-				<AdminDocuments on:save={adminConfigSaveHandler} />
-			{:else if selectedTab === 'admin:web'}
-				<AdminWebSearch saveHandler={adminConfigSaveHandler} />
-			{:else if selectedTab === 'admin:code-execution'}
-				<AdminCodeExecution saveHandler={adminConfigSaveHandler} />
-			{:else if selectedTab === 'admin:interface'}
-				<AdminInterface
-					saveHandler={() => {
-						toast.success($i18n.t('Settings saved successfully!'));
-					}}
-				/>
-			{:else if selectedTab === 'admin:audio'}
-				<AdminAudio
-					saveHandler={() => {
-						toast.success($i18n.t('Settings saved successfully!'));
-					}}
-				/>
-			{:else if selectedTab === 'admin:images'}
-				<AdminImages
-					on:save={() => {
-						toast.success($i18n.t('Settings saved successfully!'));
-					}}
-				/>
-			{:else if selectedTab === 'admin:db'}
-				<AdminDatabase
-					saveHandler={() => {
-						toast.success($i18n.t('Settings saved successfully!'));
-					}}
-				/>
-			{:else if selectedTab === 'admin:pipelines'}
-				<AdminPipelines
-					saveHandler={() => {
-						toast.success($i18n.t('Settings saved successfully!'));
-					}}
-				/>
-			{/if}
+				{:else if selectedTab === 'personalization'}
+					<Personalization
+						{saveSettings}
+						on:save={() => {
+							toast.success($i18n.t('Settings saved successfully!'));
+						}}
+					/>
+				{:else if selectedTab === 'data_controls'}
+					<DataControls {saveSettings} />
+				{:else if selectedTab === 'usage'}
+					<Usage />
+				{:else if selectedTab === 'archived_chats'}
+					<ArchivedChats />
+				{:else if selectedTab === 'account'}
+					<Account
+						saveHandler={() => {
+							toast.success($i18n.t('Settings saved successfully!'));
+						}}
+					/>
+				{:else if selectedTab === 'about'}
+					<About />
+				{:else if selectedTab === 'admin:general'}
+					<AdminGeneral saveHandler={adminConfigSaveHandler} />
+				{:else if selectedTab === 'admin:authentication'}
+					<AdminAuthentication />
+				{:else if selectedTab === 'admin:connections'}
+					<!-- hook④（D4/F5）：轻量指向卡——状态卡本体迁 /arch（tab 行保留不动） -->
+					<div class="flex flex-col items-center justify-center gap-3 py-20 text-center">
+						<div class="text-sm font-medium text-black dark:text-white">
+							{$i18n.t('Engine status has moved')}
+						</div>
+						<div class="max-w-md text-xs text-gray-500 dark:text-gray-400">
+							{$i18n.t('The engine status card now lives on the Architecture page.')}
+						</div>
+						<button
+							class="text-xs font-medium rounded-lg px-3.5 py-1.5 bg-black text-white dark:bg-white dark:text-black hover:opacity-80 transition"
+							type="button"
+							on:click={() => {
+								show = false;
+								goto('/arch');
+							}}
+						>
+							{$i18n.t('Open Architecture page')}
+						</button>
+					</div>
+				{:else if selectedTab === 'admin:web'}
+					<!-- banyan F6：Web 搜索裁到单引擎（开关+引擎下拉+key+结果数/域名过滤） -->
+					<AdminWebSearch saveHandler={adminConfigSaveHandler} />
+				{:else if selectedTab === 'admin:interface'}
+					<AdminInterface
+						saveHandler={() => {
+							toast.success($i18n.t('Settings saved successfully!'));
+						}}
+					/>
+				{:else if selectedTab === 'admin:db'}
+					<AdminDatabase
+						saveHandler={() => {
+							toast.success($i18n.t('Settings saved successfully!'));
+						}}
+					/>
+				{/if}
 		</div>
 	</div>
 </Modal>

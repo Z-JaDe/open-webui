@@ -1,25 +1,11 @@
 <script lang="ts">
+	// banyan D24（完整方案 §12.5）：workspace 五面退役。
+	// 原逻辑按权限跳 models/knowledge/prompts/tools/skills 各面；
+	// admin 落点 /workspace/models 路由已删（此前 404），五面均已退役——统一回对话首页。
 	import { goto } from '$app/navigation';
-	import { config, user } from '$lib/stores';
 	import { onMount } from 'svelte';
 
 	onMount(() => {
-		if ($user?.role !== 'admin') {
-			if ($user?.permissions?.workspace?.models) {
-				goto('/workspace/knowledge', { replaceState: true });
-			} else if ($user?.permissions?.workspace?.knowledge) {
-				goto('/workspace/knowledge', { replaceState: true });
-			} else if ($user?.permissions?.workspace?.prompts) {
-				goto('/workspace/prompts', { replaceState: true });
-			} else if ($config?.features?.enable_tools && $user?.permissions?.workspace?.tools) {
-				goto('/workspace/tools', { replaceState: true });
-			} else if ($user?.permissions?.workspace?.skills) {
-				goto('/workspace/skills', { replaceState: true });
-			} else {
-				goto('/', { replaceState: true });
-			}
-		} else {
-			goto('/workspace/models', { replaceState: true });
-		}
+		goto('/', { replaceState: true });
 	});
 </script>
