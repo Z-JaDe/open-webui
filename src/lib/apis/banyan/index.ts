@@ -43,6 +43,9 @@ export type BanyanPlanSnapshot = {
 	plan: import('$lib/components/banyan/types').BanyanPlanEvent;
 	/** plan_id 下全部 wave_update 事件（按序），直接喂给 WaveBoard */
 	wave_updates: import('$lib/components/banyan/types').BanyanWaveUpdateEvent[];
+	/** 引擎方案行原始状态（RF-20b：blocked=完成门/攻击门拦截；PLAN_STATUS_MAP 会把
+	 * blocked 折进 approved，下钻页靠本字段渲染拦截提示条） */
+	engine_status?: string;
 };
 
 export type BanyanTreeNode = {
@@ -261,7 +264,8 @@ export const getBanyanAuditEvents = async (
 // 方案与波次 /plans
 ////////////////////////////
 	// 引擎 plan 状态(open|pending_approval|rejected|running|blocked|finished|revised|
-	// orphaned[TA-2:重启孤儿复位,可重新批准重入])→ 页面五态
+	// orphaned[TA-2:重启孤儿复位,可重新批准重入])→ 页面五态;blocked 折进 approved,
+	// 原始态经 BanyanPlanSnapshot.engine_status 透出(RF-20b 完成门拦截提示条用)
 	const PLAN_STATUS_MAP: Record<string, import('$lib/components/banyan/types').BanyanPlanEvent['status']> = {
 		open: 'pending',
 		pending_approval: 'pending',
@@ -348,7 +352,7 @@ export const getBanyanPlan = async (
 		.sort((a, b) => a[0] - b[0])
 		.map(([wave, tasks]) => ({ type: 'wave_update' as const, plan_id: id, wave, tasks }));
 
-	return { plan, wave_updates };
+	return { plan, wave_updates, engine_status: String(row.status ?? '') };
 };
 
 /** PlanCard 批准/驳回/选B 按钮的原生提交目标 */
@@ -400,6 +404,64 @@ export const getBanyanPlans = async (
 			failed: Number(p?.tasks?.failed ?? 0),
 			skipped: Number(p?.tasks?.skipped ?? 0)
 		}
+	}));
+};
+
+////////////////////////////
+// 方案断言登记簿 /registry?plan_id=X（RF-20b：下钻页红绿断言分组）
+////////////////////////////
+export type BanyanPlanAssertion = {
+	id: string;
+	/** 断言指纹："red-" 前缀=开工红测（spec 为红测命令），其余=交付验收（分组轴） */
+	fingerprint: string;
+	/** 断言/红测命令原文 */
+	spec: string;
+	status: BanyanRegistryEntry['status'];
+	/** 阶段 detail（"pre-work red"/"final green"）或 pass|fail 原文（展示用） */
+	last_result?: string;
+	/** 着色轴：pass=通过 / fail=未通过 / unknown=未验证（final green→pass，pre-work red→fail） */
+	verdict: 'pass' | 'fail' | 'unknown';
+	last_checked_at?: number;
+	task_id?: string;
+};
+
+/** last_result + 阶段 detail → 通过/未通过/未知（RF-20：红测阶段 detail 自带色词） */
+const toVerdict = (raw: any): BanyanPlanAssertion['verdict'] => {
+	const result = String(raw?.last_result ?? '')
+		.trim()
+		.toLowerCase();
+	const hay = `${result} ${raw?.last_detail ?? ''}`;
+	if (result === 'pass') return 'pass';
+	if (result === 'fail') return 'fail';
+	if (/final green/i.test(hay)) return 'pass';
+	if (/pre-work red/i.test(hay) || /(^|\s)red(\s|$)/i.test(result)) return 'fail';
+	return 'unknown';
+};
+
+export const getBanyanPlanRegistry = async (
+	planId: string,
+	token: string = localStorage.token
+): Promise<BanyanPlanAssertion[]> => {
+	const res = await fetch(`${BANYAN_API_BASE_URL}/registry?plan_id=${encodeURIComponent(planId)}`, {
+		method: 'GET',
+		headers: { Authorization: `Bearer ${token}` }
+	});
+	if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+	// 引擎 GET /api/registry?plan_id=X 返回该方案的 orch_regs 行数组:
+	// {id, plan_id, task_id, fingerprint, kind, spec, last_result, last_detail,
+	//  last_checked_at, accepted, created_at}
+	// RF-20 冻结契约:红测断言 fingerprint 带 "red-" 前缀,spec 为红测命令,
+	// last_result/last_detail 带 "pre-work red"/"final green" 阶段 detail。
+	const rows = asArray(await res.json());
+	return rows.map((r: any): BanyanPlanAssertion => ({
+		id: String(r?.id ?? ''),
+		fingerprint: String(r?.fingerprint ?? ''),
+		spec: String(r?.spec ?? r?.fingerprint ?? r?.id ?? ''),
+		status: toRegistryStatus(r),
+		last_result: r?.last_detail || r?.last_result || undefined,
+		verdict: toVerdict(r),
+		last_checked_at: toMs(r?.last_checked_at),
+		task_id: r?.task_id ? String(r.task_id) : undefined
 	}));
 };
 
