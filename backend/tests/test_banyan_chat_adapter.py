@@ -429,7 +429,7 @@ def test_list_chats_pushes_q_title_search_down(monkeypatch):
     assert any('q=%E6%8E%92%E6%9F%A5' in p for p in seen)  # q 经 URL 编码下推引擎
 
 
-# ── F13 标题回写(sess_ 任务轮 → 引擎 PATCH title,保守裁决)──
+# ── F13 标题回写(sess_ 任务轮 → 引擎 PATCH title;判定=title_source≠custom)──
 
 
 def _title_meta(**kw):
@@ -449,21 +449,30 @@ def test_write_back_title_patches_when_engine_title_empty(monkeypatch):
     assert ('PATCH', '/api/sessions/sess_abc', {'title': '排查X并修复'}) in calls  # 去首尾空白
 
 
-def test_write_back_title_never_overwrites_existing_title(monkeypatch):
-    """引擎首条消息 50 字截断已先行定题 → 任务轮题目不覆盖(F13 保守裁决)。"""
+def test_write_back_title_upgrades_first_message_title(monkeypatch):
+    """E3-P2-4 红绿:引擎首条 50 字截断题(first_message)允许被 LLM 标题升级。
+
+    (修前"仅 title 为空才 PATCH"——引擎自动出题后 title 恒非空,回写恒 no-op。)"""
     monkeypatch.setenv('BANYAN_ENGINE_URL', ENGINE)
     calls = _install_engine(monkeypatch, ba, [
         ('GET', '/api/sessions/sess_abc',
          _Resp(200, {'meta': _title_meta(title='帮我排查X并修复'), 'rows': [], 'total': 0})),
         ('PATCH', '/api/sessions/sess_abc', _Resp(200, {'ok': True})),
     ])
-    assert _run(ba.write_back_title('sess_abc', '任务轮题目')) is False
-    assert all(m != 'PATCH' for m, _p, _j in calls)  # 零 PATCH
+    assert _run(ba.write_back_title('sess_abc', '任务轮生成的更准题目')) is True
+    assert ('PATCH', '/api/sessions/sess_abc', {'title': '任务轮生成的更准题目'}) in calls
 
 
 def test_write_back_title_never_overwrites_custom_source(monkeypatch):
-    """title_source=custom(人改名)→ 永不覆盖,即使 title 恰为空。"""
+    """title_source=custom(人改名)→ 永不覆盖,无论现 title 是否为空。"""
     monkeypatch.setenv('BANYAN_ENGINE_URL', ENGINE)
+    calls = _install_engine(monkeypatch, ba, [
+        ('GET', '/api/sessions/sess_abc',
+         _Resp(200, {'meta': _title_meta(title='我的会话名', title_source='custom'), 'rows': [], 'total': 0})),
+    ])
+    assert _run(ba.write_back_title('sess_abc', '任务轮题目')) is False
+    assert all(m != 'PATCH' for m, _p, _j in calls)
+
     calls = _install_engine(monkeypatch, ba, [
         ('GET', '/api/sessions/sess_abc',
          _Resp(200, {'meta': _title_meta(title='', title_source='custom'), 'rows': [], 'total': 0})),

@@ -68,7 +68,7 @@ def is_engine_chat(chat_id: Any) -> bool:
 
 
 def engine_base_url() -> str:
-    return os.environ.get('BANYAN_ENGINE_URL', 'http://localhost:8420').rstrip('/')
+    return os.environ.get('BANYAN_ENGINE_URL', 'http://localhost:8000').rstrip('/')
 
 
 def _engine_headers() -> dict[str, str]:
@@ -517,18 +517,17 @@ async def mark_chat_read(sess_id: str) -> bool:
 async def write_back_title(sess_id: str, title: str) -> bool:
     """F13 标题回写半边:任务轮(title 生成)产出的题目写回引擎会话。
 
-    保守裁决(完整方案 F13"否则 F7 后自动标题丢显"):仅当引擎会话**尚无标题**
-    时才 PATCH——引擎首条真实轮先以首条消息截 50 字定题(engine.py:_chat_turn
-    title_source=first_message),已题不覆盖;title_source=custom(人改名/回写过的)
-    永不覆盖(引擎 PATCH title 会置 custom 短路自动标题,故以源判定兜底)。
-    引擎不可得/条件不符返回 False(调用方静默跳过,绝不阻断)。"""
+    判定(RV-23W E3-P2-4)``title_source != 'custom'`` 即 PATCH——修前"仅引擎
+    title 为空才 PATCH"是恒 no-op:引擎首条真实轮先以首条消息截 50 字定题
+    (engine.py:_chat_turn,title_source=first_message),任务轮到达时 title 恒
+    非空,回写永不发生;改后引擎首条截断题允许被 LLM 标题升级。仅
+    title_source=custom(人改名,引擎 PATCH title 会置 custom 短路自动标题)
+    永不覆盖。引擎不可得/条件不符返回 False(调用方静默跳过,绝不阻断)。"""
     title = (title or '').strip()
     if not title:
         return False
     meta = await get_session_meta(sess_id)
     if not meta:
-        return False
-    if str(meta.get('title') or '').strip():
         return False
     if meta.get('title_source') == 'custom':
         return False

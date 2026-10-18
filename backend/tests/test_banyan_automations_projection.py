@@ -12,9 +12,10 @@ models/automations 载真实文件以保真实 pydantic 形状),引擎 API 以�
 - 引擎 item → AutomationResponse 投影形状(tier↔model_id、ns 时间、
   引擎真键 schedule_json/next_run_at/last_run_at(C1-2)、schedule_raw str
   解析容错(C1-2)、last_run/next_runs Optional 容忍 null);
-- handler 投影:list 分页切片+query 过滤+status 映射 / create(频道 target 400、
+- handler 投影:list 分页切片+query 过滤+status 透传(''=全部,paused 可见)/ create(频道 target 400、
   CUSTOM 400、POST 体含 schedule+schedule_raw=str JSON(C1-1)、建后即停补 PATCH)/
-  toggle(list 定位+PATCH enabled 取反)/ update / runs 切片 / delete;
+  toggle(引擎单查定位+PATCH enabled 取反)/ 单查 GET /api/automations/{id} /
+  update / runs 切片 / delete;
 - _engine_call 真错误映射:引擎不可达 → 502。
 
 运行:cd backend && ../venv/bin/python -m pytest tests/test_banyan_automations_projection.py -q
@@ -230,7 +231,10 @@ class _EngineStub:
 
     async def __call__(self, method, path, *, params=None, json=None):
         self.calls.append((method, path, params, json))
-        return self.responses.pop(0)
+        outcome = self.responses.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
 
 
 def _install(responses):
@@ -246,14 +250,24 @@ def test_handler_list_pagination_and_filters():
     ]
     stub = _install([{'items': items, 'total': 35}, {'items': items, 'total': 35}])
     result = _run(ar.get_automation_items(request=None, query='巡检特例', status='active', folder_id=None, page=1, user=USER))
-    assert stub.calls[0][0] == 'GET' and stub.calls[0][1] == '/automations'
+    assert stub.calls[0][0] == 'GET' and stub.calls[0][1] == '/api/automations'
     assert stub.calls[0][2]['status'] == 'active' and stub.calls[0][2]['limit'] == 30  # page=1×30
     assert result['total'] == 35
     assert [i.id for i in result['items']] == ['a0']
     page2 = _run(ar.get_automation_items(request=None, query=None, status=None, folder_id=None, page=2, user=USER))
     page2_params = stub.calls[-1][2]
-    assert page2_params.get('status') is None and page2_params['limit'] == 60  # status=all 不下发;取前 60 条
+    # E4-P1 红绿:全部视图显式传 status=''(引擎缺省 active,不传=暂停项失联)
+    assert page2_params.get('status') == '' and page2_params['limit'] == 60
     assert len(page2['items']) == 5 and page2['items'][0].id == 'a30'  # 本地切片模拟 fork 分页(尾页不足 30)
+
+
+def test_handler_list_maps_all_literal_to_empty_status():
+    """前端 All 视图（status='all' 或 None）→ 引擎 status=''（空=全部，可见 paused）。"""
+    stub = _install([{'items': [], 'total': 0}, {'items': [], 'total': 0}])
+    _run(ar.get_automation_items(request=None, query=None, status='all', folder_id=None, page=1, user=USER))
+    assert stub.calls[0][2]['status'] == ''
+    _run(ar.get_automation_items(request=None, query=None, status='paused', folder_id=None, page=1, user=USER))
+    assert stub.calls[-1][2]['status'] == 'paused'
 
 
 def test_handler_create_translates_and_carries_raw():
@@ -264,7 +278,7 @@ def test_handler_create_translates_and_carries_raw():
     )
     response = _run(ar.create_new_automation(request=None, form_data=form, user=USER))
     method, path, params, body = stub.calls[0]
-    assert (method, path) == ('POST', '/automations')
+    assert (method, path) == ('POST', '/api/automations')
     assert body['tier'] == 'fast' and body['name'] == '每日报'
     assert body['schedule'] == {'kind': 'daily', 'time': '09:30'}
     # C1-1 契约钉线:引擎 AutomationIn.schedule_raw 是 str(dict → 422 全链断),
@@ -307,16 +321,36 @@ def test_handler_create_inactive_patches_enabled_false():
         name='q', is_active=False, data=_models_automations.AutomationData(prompt='p', model_id='banyan-duty', rrule='FREQ=HOURLY')
     )
     response = _run(ar.create_new_automation(request=None, form_data=form, user=USER))
-    assert stub.calls[1][:2] == ('PATCH', '/automations/auto-q')  # 契约 POST 体无 enabled → 建后即停补 PATCH
+    assert stub.calls[1][:2] == ('PATCH', '/api/automations/auto-q')  # 契约 POST 体无 enabled → 建后即停补 PATCH
     assert stub.calls[1][3] == {'enabled': False}
     assert response.is_active is False
 
 
-def test_handler_toggle_negates_enabled():
-    stub = _install([{'items': [{**_ENGINE_ITEM, 'enabled': True}], 'total': 1}, {**_ENGINE_ITEM, 'enabled': False}])
+def test_handler_get_by_id_uses_engine_single_query():
+    """E3-P1-2 红绿:单查走引擎实有 GET /api/automations/{id}(不再 list 内定位)。"""
+    stub = _install([{**_ENGINE_ITEM, 'enabled': False}])  # 单查对暂停项同样可达
+    response = _run(ar.get_automation_by_id(request=None, id='auto1', user=USER))
+    assert stub.calls[0] == ('GET', '/api/automations/auto1', None, None)
+    assert response.id == 'auto1' and response.is_active is False
+
+    stub = _install([ar.HTTPException(404, detail='no such automation')])
+    import fastapi
+
+    try:
+        _run(ar.get_automation_by_id(request=None, id='missing', user=USER))
+        raise AssertionError('expected 404')
+    except fastapi.HTTPException as e:
+        assert e.status_code == 404
+    assert stub.calls == [('GET', '/api/automations/missing', None, None)]
+
+
+def test_handler_toggle_single_query_sees_paused():
+    """E4-P1 红绿:toggle 定位走单查(修前 list 只回 active,暂停项 toggle 404)。"""
+    stub = _install([{**_ENGINE_ITEM, 'enabled': False}, {**_ENGINE_ITEM, 'enabled': True}])
     response = _run(ar.toggle_automation_by_id(request=None, id='auto1', user=USER))
-    assert stub.calls[1] == ('PATCH', '/automations/auto1', None, {'enabled': False})  # list 定位+取反
-    assert response.is_active is False
+    assert stub.calls[0] == ('GET', '/api/automations/auto1', None, None)  # 单查定位
+    assert stub.calls[1] == ('PATCH', '/api/automations/auto1', None, {'enabled': True})  # 取反
+    assert response.is_active is True
 
 
 def test_handler_update_translates_rrule():
@@ -346,7 +380,7 @@ def test_handler_runs_slices():
 def test_handler_delete_returns_true():
     stub = _install([{'ok': True}])
     assert _run(ar.delete_automation_by_id(request=None, id='auto1', user=USER)) is True
-    assert stub.calls[0][:2] == ('DELETE', '/automations/auto1')
+    assert stub.calls[0][:2] == ('DELETE', '/api/automations/auto1')
 
 
 def test_engine_call_unreachable_maps_502():
@@ -370,10 +404,9 @@ def test_engine_call_unreachable_maps_502():
         Timeout=real_httpx.Timeout,
     )
     try:
-        try:
-            _run(_REAL_ENGINE_CALL('GET', '/automations'))
-            raise AssertionError('expected 502')
-        except ar.HTTPException as e:
-            assert e.status_code == 502 and 'unreachable' in e.detail
+        _run(_REAL_ENGINE_CALL('GET', '/api/automations'))
+        raise AssertionError('expected 502')
+    except ar.HTTPException as e:
+        assert e.status_code == 502 and 'unreachable' in e.detail
     finally:
         ar.httpx = real_httpx

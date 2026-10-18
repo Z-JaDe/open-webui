@@ -61,7 +61,7 @@ _chat_locks: dict[str, asyncio.Lock] = {}
 
 def engine_base_url() -> str:
     """引擎 base URL（与代理桥同源 env；尾斜杠归一）。"""
-    return os.environ.get('BANYAN_ENGINE_URL', 'http://localhost:8420').rstrip('/')
+    return os.environ.get('BANYAN_ENGINE_URL', 'http://localhost:8000').rstrip('/')
 
 
 def _engine_headers() -> dict[str, str]:

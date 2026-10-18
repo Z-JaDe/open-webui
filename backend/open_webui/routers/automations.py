@@ -5,14 +5,17 @@ fork automation 表禁用(F12 已置 ``automations.enable=False``——本地调
 utils/automations.scheduler_worker_loop,只读不动),本路由 8 个 handler 的路径与
 请求/响应形状原样保留(前端零改),体内全部改为引擎调用:
 
-- GET    /list          → GET    /api/automations?status=active|paused&limit
+- GET    /list          → GET    /api/automations?status=active|paused|''(空=全部)&limit
 - POST   /create        → POST   /api/automations {name,prompt,tier,schedule,schedule_raw}
-- GET    /{id}          → GET    /api/automations(list 内按 id 定位;引擎契约无单查端点)
+- GET    /{id}          → GET    /api/automations/{id}(引擎实有单查端点,RV-23W E3-P1-2)
 - POST   /{id}/update   → PATCH  /api/automations/{id} {name?|prompt?|tier?|schedule?|enabled?}
-- POST   /{id}/toggle   → list 定位后 PATCH {enabled: 取反}(同上,无单查)
+- POST   /{id}/toggle   → 单查定位后 PATCH {enabled: 取反}(引擎实有单查端点)
 - POST   /{id}/run      → POST   /api/automations/{id}/fire
 - DELETE /{id}/delete   → DELETE /api/automations/{id}
 - GET    /{id}/runs     → GET    /api/automations/{id}/runs
+
+_status 透传语义(RV-23W E4-P1):引擎缺省 status=active——fork 的"全部"视图必须
+显式传空串(''=全部),否则暂停项失联(修前不传 → 引擎回落 active)。
 
 **automations.enable 门槛摘除**:fork 定义面已整体弃用,门槛只剩"挡投影页"的
 副作用(F12 置 false 后整页 403)——保留 get_verified_user 登录门槛即可。
@@ -68,7 +71,7 @@ _API_TIMEOUT = 10.0
 
 
 def _engine_base_url() -> str:
-    return os.environ.get('BANYAN_ENGINE_URL', 'http://localhost:8420').rstrip('/')
+    return os.environ.get('BANYAN_ENGINE_URL', 'http://localhost:8000').rstrip('/')
 
 
 def _engine_headers() -> dict:
@@ -101,11 +104,15 @@ async def _engine_call(method: str, path: str, *, params: dict = None, json: dic
 
 
 async def _engine_list(status: Optional[str] = None, limit: int = _ENGINE_LIST_CAP) -> tuple[list, int]:
-    """GET /api/automations → (items, total);契约 {items,total}。"""
-    params = {'limit': limit}
-    if status in ('active', 'paused'):
-        params['status'] = status
-    payload = await _engine_call('GET', '/automations', params=params)
+    """GET /api/automations → (items, total);契约 {items,total}。
+
+    status 对齐引擎语义:''=全部、active、paused(引擎缺省 active,故 fork 的
+    "全部"视图(None/'all'/空)必须显式传空串,否则暂停项失联——RV-23W E4-P1)。
+    """
+    if status is None or status.strip() in ('', 'all'):
+        status = ''  # ''=全部(引擎缺省 active,不下发即失联暂停项)
+    params = {'limit': limit, 'status': status}
+    payload = await _engine_call('GET', '/api/automations', params=params)
     if isinstance(payload, list):
         return payload, len(payload)
     items = payload.get('items') or []
@@ -117,12 +124,15 @@ async def _engine_list(status: Optional[str] = None, limit: int = _ENGINE_LIST_C
 
 
 async def _engine_get_item(automation_id: str) -> Optional[dict]:
-    """按 id 定位(引擎契约无单查端点,list 内找)。"""
-    items, _ = await _engine_list(limit=_ENGINE_LIST_CAP)
-    for item in items:
-        if str(item.get('id')) == str(automation_id):
-            return item
-    return None
+    """引擎单查 GET /api/automations/{id}(api.py:1410 实有端点);404 → None。
+
+    (RV-23W E3-P1-2:此前走 list 内定位,修后暂停项失联——list 只回 active。)"""
+    try:
+        return await _engine_call('GET', f'/api/automations/{automation_id}')
+    except HTTPException as e:
+        if e.status_code == 404:
+            return None
+        raise
 
 
 ############################
@@ -403,7 +413,7 @@ async def create_new_automation(
 
     item = await _engine_call(
         'POST',
-        '/automations',
+        '/api/automations',
         json={
             'name': form_data.name,
             'prompt': form_data.data.prompt,
@@ -415,7 +425,7 @@ async def create_new_automation(
     )
     # 契约 POST 体无 enabled:建后即停用补一次 PATCH
     if form_data.is_active is False:
-        item = await _engine_call('PATCH', f"/automations/{item.get('id')}", json={'enabled': False}) or item
+        item = await _engine_call('PATCH', f"/api/automations/{item.get('id')}", json={'enabled': False}) or item
     await publish_event(
         request,
         EVENTS.AUTOMATION_CREATED,
@@ -476,7 +486,7 @@ async def update_automation_by_id(
             patch['schedule_raw'] = json.dumps({'rrule': form_data.data.rrule}, ensure_ascii=False)
     patch['enabled'] = form_data.is_active is not False
 
-    item = await _engine_call('PATCH', f'/automations/{id}', json=patch)
+    item = await _engine_call('PATCH', f'/api/automations/{id}', json=patch)
     if not item:
         item = await _engine_get_item(id)
     if item is None:
@@ -505,7 +515,7 @@ async def toggle_automation_by_id(
     item = await _engine_get_item(id)
     if item is None:
         raise HTTPException(404, detail='Automation not found')
-    toggled = await _engine_call('PATCH', f'/automations/{id}', json={'enabled': not item.get('enabled', True)})
+    toggled = await _engine_call('PATCH', f'/api/automations/{id}', json={'enabled': not item.get('enabled', True)})
     item = toggled or {**item, 'enabled': not item.get('enabled', True)}
     await publish_event(
         request,
@@ -532,7 +542,7 @@ async def run_automation_by_id(
     item = await _engine_get_item(id)
     if item is None:
         raise HTTPException(404, detail='Automation not found')
-    await _engine_call('POST', f'/automations/{id}/fire')
+    await _engine_call('POST', f'/api/automations/{id}/fire')
     await publish_event(
         request,
         EVENTS.AUTOMATION_RUN_STARTED,
@@ -554,7 +564,7 @@ async def delete_automation_by_id(
     id: str,
     user=Depends(get_verified_user),
 ):
-    await _engine_call('DELETE', f'/automations/{id}')
+    await _engine_call('DELETE', f'/api/automations/{id}')
     await publish_event(
         request,
         EVENTS.AUTOMATION_DELETED,
@@ -577,7 +587,7 @@ async def get_automation_runs(
     limit: int = 50,
     user=Depends(get_verified_user),
 ):
-    payload = await _engine_call('GET', f'/automations/{id}/runs')
+    payload = await _engine_call('GET', f'/api/automations/{id}/runs')
     runs = payload.get('items') if isinstance(payload, dict) else payload
     runs = runs or []
     return [

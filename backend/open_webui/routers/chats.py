@@ -276,6 +276,19 @@ class CompactChatForm(BaseModel):
     model: str | None = None
 
 
+def _reject_engine_chat_operation(id: str) -> None:
+    """消息级操作对引擎会话(sess_*)早 404 分流(RV-23W E3-P2-5)。
+
+    引擎会话是线性树,无 WebUI 侧消息级编辑/事件/压缩/fork/clone;放行会落到
+    `Chats.get_chat_by_id` 的零行 401 裸错(语义错且提示缺失)。此处显式 404,
+    detail 透传前端菜单可达处给出明确提示。"""
+    if banyan_chat_adapter.is_engine_chat(id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail='引擎会话不支持该操作(sess_ 会话为引擎线性树,无 WebUI 侧消息级编辑/压缩/分支工程)',
+        )
+
+
 def chat_search_content_text(text: str) -> str:
     return chat_search_content_query(text)
 
@@ -1491,6 +1504,7 @@ async def compact_chat_by_id(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    _reject_engine_chat_operation(id)  # banyan E3-P2-5:引擎线性树无 WebUI 侧压缩
     chat = await Chats.get_chat_by_id_and_user_id(id, user.id, db=db)
     if not chat:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=ERROR_MESSAGES.NOT_FOUND)
@@ -1667,6 +1681,7 @@ async def update_chat_message_by_id(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    _reject_engine_chat_operation(id)  # banyan E3-P2-5:引擎会话消息零存储,无 WebUI 侧编辑
     chat = await Chats.get_chat_by_id(id, db=db)
 
     if not chat:
@@ -1733,6 +1748,7 @@ async def delete_chat_message_by_id(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    _reject_engine_chat_operation(id)  # banyan E3-P2-5:引擎会话消息删除无 WebUI 侧对端
     chat = await Chats.get_chat_by_id(id, db=db)
 
     if not chat:
@@ -1781,6 +1797,7 @@ async def send_chat_message_event_by_id(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    _reject_engine_chat_operation(id)  # banyan E3-P2-5:引擎会话无 WebUI 消息事件线
     chat = await Chats.get_chat_by_id(id, db=db)
 
     if not chat:
@@ -1986,6 +2003,7 @@ async def fork_chat_by_id(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    _reject_engine_chat_operation(id)  # banyan E3-P2-5:引擎会话零本地行,无 WebUI 侧 fork
     await require_chat_import_permission(request, user, db)
 
     chat = await Chats.get_accessible_chat_by_id(id, user, db=db)
@@ -2101,6 +2119,7 @@ async def clone_chat_by_id(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    _reject_engine_chat_operation(id)  # banyan E3-P2-5:引擎会话零本地行,无 WebUI 侧 clone
     await require_chat_import_permission(request, user, db)
 
     chat = await Chats.get_chat_by_id_and_user_id(id, user.id, db=db)

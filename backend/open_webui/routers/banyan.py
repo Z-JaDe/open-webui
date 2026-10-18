@@ -4,11 +4,11 @@ banyan 代理桥（统一设计 §6.1 / §8 G4）
 fork 自家 FastAPI 增加 /banyan/api/* 反向代理，把前端五路由与组件的全部数据
 请求转发到 banyan 引擎 API（env BANYAN_ENGINE_URL），并桥接鉴权：
 
-- 引擎地址：env `BANYAN_ENGINE_URL`（默认 http://localhost:8420）。
+- 引擎地址：env `BANYAN_ENGINE_URL`（默认 http://localhost:8000）。
   该地址作为 base，代理按原路径 1:1 追加：
     /banyan/api/plans/x/resolve  ->  {BANYAN_ENGINE_URL}/plans/x/resolve
   若引擎挂在子路径下，直接把子路径写进 BANYAN_ENGINE_URL 即可
-  （例如 http://engine:8420/api/v1）。
+  （例如 http://engine:8000/api/v1）。
 - 鉴权桥接（RFF P1 修正：Authorization 必须**替换**而非叠加）：
   - env `BANYAN_TOKEN` 设置时，剥离客户端自带的 Authorization 头（大小写不敏感），
     以静态 `Authorization: Bearer <token>` 转发——此前 dict 大小写敏感两键并存、
@@ -20,17 +20,17 @@ fork 自家 FastAPI 增加 /banyan/api/* 反向代理，把前端五路由与组
 路径规则与引擎端点对应（前端 $lib/apis/banyan）：
   GET  /registry                      断言登记簿
   GET  /cards                         语义卡列表
-  POST /cards/{id}/resolve            审卡批准/驳回
+  POST /cards/resolve                 审卡批准/驳回（body {id, decision}，非子路径）
   GET  /audit                         K1 事件浏览（支持 chat_id/type/limit query）
   GET  /events                        K1 事件流 SSE 透传（D15/F8，专用端点见下）
   GET  /plans/{plan_id}               方案快照（plan + wave_updates）
   POST /plans/{plan_id}/resolve       方案批准/驳回/选B
   GET  /chats/{chat_id}/tree          会话树
-  POST /chats/{chat_id}/tree/switch   切换活动分支
-  POST /chats/{chat_id}/tree/rerun    重跑某轮
-  POST /subagents/{id}/stop           停止子代理
+  POST /chats/{chat_id}/tree/switch   切换活动分支（引擎对端缺位，404 提示；台账已登记）
+  POST /work/{id}/cancel              停止子代理（RF-Z 真实对端；旧 /subagents/{id}/stop 引擎无此路由已弃）
 """
 
+import asyncio
 import logging
 import os
 from typing import Any
@@ -45,7 +45,7 @@ log = logging.getLogger(__name__)
 
 router = APIRouter()
 
-BANYAN_ENGINE_URL = os.environ.get("BANYAN_ENGINE_URL", "http://localhost:8420").rstrip("/")
+BANYAN_ENGINE_URL = os.environ.get("BANYAN_ENGINE_URL", "http://localhost:8000").rstrip("/")
 BANYAN_TOKEN = os.environ.get("BANYAN_TOKEN", "")
 BANYAN_TIMEOUT = float(os.environ.get("BANYAN_TIMEOUT", "300"))
 
@@ -232,6 +232,12 @@ async def banyan_proxy(
             content=body,
         )
         upstream_response = await client.send(upstream_request, stream=True)
+    except asyncio.CancelledError:
+        # E3-P3-2:客户端断连取消同样会从 await 点冒出——CancelledError 是
+        # BaseException,不入下方 HTTPError 分支,不 aclose 即漏一个连接池
+        # (对齐 /events 端点与 L1-11 的收口纪律);收口后原样上抛保取消语义。
+        await client.aclose()
+        raise
     except httpx.ConnectError as exc:
         await client.aclose()
         raise HTTPException(

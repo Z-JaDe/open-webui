@@ -9,8 +9,11 @@ httpx 桩掉。
 - sess_* 会话评分 → POST 引擎 /api/feedback(conv_id/message_row_id/rating/
   reason;reason 缺省时 details 摘要),成功返回合成 FeedbackModel(id='fbx-*'),
   fork feedback 表零写入(写即炸桩证明);
-- 非 sess_ 存量会话 → 原路径零改(Feedbacks.insert 被调,引擎零调用);
-- snapshot.chat(竞技场快照)不桥接,走原路径;
+- 标准 UI 评分(自带 snapshot.chat)对 sess_ 会话仍必桥接(E3-P1-3 红绿:
+  修前 snapshot.chat 非空早返回→不 POST 引擎,评分静默丢失);
+- 非 sess_ 存量会话 → 原路径零改(Feedbacks.insert 被调,引擎零调用),
+  snapshot 形状不参与判据;
+- 引擎会话 rating 缺失 → 早 400(不沉库不透传引擎);
 - 引擎不可达/5xx → 502 且不沉库(可重试);引擎 404(未知 conv)原码透传;
 - update 路径同桥(fork 无 fbx 行可更,引擎按 conv/message 幂等落账)。
 
@@ -237,14 +240,54 @@ def test_legacy_chat_goes_original_path():
     assert _CAPS == []
 
 
-def test_snapshot_chat_not_bridged():
+def test_standard_ui_rating_with_snapshot_bridges_engine_chat():
+    """E3-P1-3 红绿:标准 UI 评分载荷自带 snapshot.chat,引擎会话仍必须桥接。
+
+    (修前 snapshot.chat 非空早返回→引擎零调用,评分静默丢失;
+    红测证据:此桩断言 POST 发生——修前 _CAPS 为空、评分沉不进引擎也没回显。)"""
+    _StubFeedbacks.boom = True  # 桥接路径必须零 fork 表写入
+    _StubFeedbacks.calls = []
+    _install_httpx([_Resp(200, {'ok': True})])
+    snapshot = {'chat': {'id': 'sess_abc', 'title': '排查X', 'history': {'messages': {}}}}  # 标准 UI 评分载荷形状
+    feedback = _run(ev.create_feedback(request=None, form_data=_form(snapshot=snapshot), user=USER, db=None))
+
+    assert len(_CAPS) == 1  # 修前此处为 0(死判据漏桥)
+    assert _CAPS[0]['json']['conv_id'] == 'sess_abc' and _CAPS[0]['json']['rating'] == -1
+    assert feedback.id.startswith('fbx-')
+    assert _StubFeedbacks.calls == []
+
+
+def test_legacy_chat_goes_original_path_regardless_of_snapshot():
+    """非 sess_ 存量 → 原路径零改;snapshot 形状不参与判据(唯一判据 is_engine_chat)。"""
     _StubFeedbacks.boom = False
     _StubFeedbacks.calls = []
     _StubFeedbacks.result = _real_feedbacks.FeedbackModel(id='fb-snap', user_id='u1', version=0, type='rating', created_at=1, updated_at=1)
     _install_httpx([])
-    feedback = _run(ev.create_feedback(request=None, form_data=_form(snapshot={'chat': {'id': 'arena'}}), user=USER, db=None))
-    assert feedback.id == 'fb-snap'  # 竞技场快照走原路径
+    feedback = _run(ev.create_feedback(request=None, form_data=_form(chat_id='old-local-chat', snapshot={'chat': {'id': 'arena'}}), user=USER, db=None))
+    assert feedback.id == 'fb-snap'  # 存量会话走原路径(带不带 snapshot 均然)
     assert _CAPS == []
+
+
+def test_engine_chat_rating_none_rejected_400():
+    """rating 缺失 → 早 400:不沉库、不透传引擎。"""
+    _StubFeedbacks.boom = True
+    _StubFeedbacks.calls = []
+    _install_httpx([])  # 引擎零调用
+    import fastapi
+
+    form = _real_feedbacks.FeedbackForm(
+        type='rating',
+        data=_real_feedbacks.RatingData(rating=None, model_id='banyan-duty'),
+        meta={'chat_id': 'sess_abc', 'message_id': 'row1'},
+        snapshot=None,
+    )
+    try:
+        _run(ev.create_feedback(request=None, form_data=form, user=USER, db=None))
+        raise AssertionError('expected 400')
+    except fastapi.HTTPException as e:
+        assert e.status_code == 400 and 'rating' in e.detail
+    assert _CAPS == []  # 不透传引擎
+    assert _StubFeedbacks.calls == []  # 不沉库
 
 
 # ── 引擎不可达/错误 → 502/透传,不沉库 ──

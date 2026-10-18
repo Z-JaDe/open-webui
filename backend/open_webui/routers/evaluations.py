@@ -430,14 +430,16 @@ async def get_feedbacks(
 ############################
 # D22 评分桥:引擎会话(sess_*)的人评 → 引擎 /api/feedback(K2 降权输入)。
 # 信号不沉 fork 库:fork feedback 表禁用(D22),桥接路径零写入、可重试;
-# 非 sess_ 存量会话返回 None 走原路径零改;snapshot.chat(竞技场快照)不桥接。
+# 非 sess_ 存量会话返回 None 走原路径零改。唯一判据 = is_engine_chat(meta.chat_id)
+# (RV-23W E3-P1-3:标准 UI 评分载荷自带 snapshot.chat,修前"snapshot.chat 非空
+# 不桥接"的死判据令引擎会话评分静默丢失——引擎会话必桥接,无论 snapshot 形状)。
 ############################
 
 _ENGINE_TIMEOUT = 10.0
 
 
 def _engine_base_url() -> str:
-    return os.environ.get('BANYAN_ENGINE_URL', 'http://localhost:8420').rstrip('/')
+    return os.environ.get('BANYAN_ENGINE_URL', 'http://localhost:8000').rstrip('/')
 
 
 def _engine_headers() -> dict:
@@ -457,24 +459,32 @@ def _details_summary(value) -> Optional[str]:
 
 
 async def _bridge_feedback(form_data: FeedbackForm, user) -> Optional[FeedbackModel]:
-    """引擎会话评分桥;返回 None = 不桥接(存量会话/snapshot,走原 fork 路径)。
+    """引擎会话评分桥;返回 None = 不桥接(非 sess_ 存量会话,走原 fork 路径)。
+
+    唯一判据 = is_engine_chat(meta.chat_id)——引擎会话必桥接,无论 snapshot
+    形状(RV-23W E3-P1-3:标准 UI 评分自带 snapshot.chat,修前早返回漏桥)。
 
     - POST 引擎 /api/feedback {conv_id, turn_id?, message_row_id?, rating, reason?};
+      rating 缺失早 400(不沉库不透传引擎);
     - 成功 → 合成 FeedbackModel(id='fbx-<hex>')回显,不落 fork 表;
     - 引擎不可达/5xx → 502(不沉库,前端可重试);引擎 4xx 原码透传(未知 conv=404)。
     """
-    if form_data.snapshot is not None and form_data.snapshot.chat:
-        return None  # 竞技场快照评分不属任何引擎会话
     meta = form_data.meta or {}
     chat_id = meta.get('chat_id')
     if not is_engine_chat(chat_id):
         return None
 
     data = form_data.data
+    rating = data.rating if data else None
+    if rating is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='评分缺少 rating(引擎会话评分必须携带 rating,不沉库不透传引擎)',
+        )
     body: dict = {
         'conv_id': chat_id,
         'message_row_id': meta.get('message_id'),
-        'rating': data.rating if data else None,
+        'rating': rating,
     }
     if meta.get('turn_id'):
         body['turn_id'] = meta.get('turn_id')

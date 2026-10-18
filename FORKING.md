@@ -27,8 +27,9 @@
 ### 钩点③ — `src/lib/components/layout/Sidebar.svelte`（任务分区入口）
 - `banyanTaskEntries` 常量（registry/cards/audit/waves/tree/arch 六入口；
   v3 W2/W3（V-10）追加 **inbox/cal 两行**）
-- v3 W2 信箱徽标（登记在钩点③内）：`getBanyanInbox` import + 60s 轮询
-  `unread.decision` 的 onMount/清 timer 块 + inbox 条目徽标渲染
+- v3 W2 信箱徽标（登记在钩点③内）：`getBanyanInbox` import + **K1 事件驱动**
+  刷新（`subscribeBanyanEvents(['inbox.'], …)` + `createBanyanRefresher`；
+  D15/F8 起 60s 轮询已按裁决退役）+ inbox 条目徽标渲染
   （任何异常静默置 0，引擎不在是常态）
 - `activeBanyanEntryPrefix` 高亮
 - `SidebarSection id="sidebar-banyan"` 区块（Channels 区块之后、Folders 之前）
@@ -114,7 +115,8 @@ history），历史载入时在钩点①恢复。事件正本仍在引擎 K1，c
   `{decision:'approved'|'rejected'|'revised', choice?}`）→ 引擎回流 `plan` 事件
   覆盖状态（前端也做乐观本地回填）。
 - 分支切换：`TreeSwitcher` → `POST /banyan/api/chats/:chat_id/tree/switch`
-  `{node_id}` → 引擎切换活动分支并投影线性消息流。
+  `{node_id}`——**引擎对端缺位**（无树写端点），调用得 404、提示条透出
+  （台账已登记，待引擎补端点后接通；勿在文档承诺"引擎切换活动分支"）。
 
 ---
 
@@ -133,13 +135,16 @@ history），历史载入时在钩点①恢复。事件正本仍在引擎 K1，c
 - 排障：`GET /banyan/api/health` 返回代理配置与引擎可达性。
 
 引擎端点约定（前端 `$lib/apis/banyan/index.ts` 为权威调用方）：
-`/registry`、`/cards`、`/cards/{id}/resolve`、`/audit`、`/plans/{id}`、
+`/registry`、`/cards`、`/cards/resolve`（body `{id, decision}`——非 RESTful
+子路径，引擎契约 `POST /api/cards/resolve`）、`/audit`、`/plans/{id}`、
 `/plans/{id}/resolve`、`/chats/{id}/tree`、`/work/{id}/cancel`
-（RF-Z：子代理停止的真实引擎对端；旧 `/subagents/{id}/stop` 引擎无此路由已弃，
-`/chats/{id}/tree/switch`、`/chats/{id}/tree/rerun` 仅消息流 TreeSwitcher/story
-面在调用、引擎侧暂无对端）。v3（W2-W4，V-4/V-5/V-8/V-10）追加：
+（RF-Z：子代理停止的真实引擎对端；旧 `/subagents/{id}/stop` 引擎无此路由已弃。
+`/chats/{id}/tree/switch` 仅消息流 TreeSwitcher 在调用、引擎侧对端缺位
+——调用 404、提示透出，台账已登记；旧 tree/rerun 已随 /tree 页死按钮摘除）。
+v3（W2-W4，V-4/V-5/V-8/V-10）追加：
 `/inbox?category=&status=&limit=`、`/inbox/{id}/read|archive|resolve`、
-`/calendar/events?from=&to=`（epoch 秒）、`POST/PATCH/DELETE /calendar/events[/{id}]`
+`/calendar/events?from_ts=&to_ts=`（epoch 秒，半开区间重叠）、
+`POST/PATCH/DELETE /calendar/events[/{id}]`
 （DELETE=取消语义）、`/status`（引擎+sidecar 聚合健康；sidecar 不可达返回
 `{ok:false}` 不 500）。
 路径穿越防护：`/banyan/api/*` 转发前经 `utils/banyan_bridge.safe_bridge_path`
@@ -229,8 +234,10 @@ meta，随后注入 `X-Banyan-Conv` 头（引擎 `_resolve_conv` 头优先）。
 （相应端点 no-op;`POST /chats/read` 批量已读经 `bulk_mark_read` 同步引擎
 sess_ 会话——RF-16 L1-10）;投影 model 名恒 `banyan-duty`（行不带档位）;跨设备
 `chat:{id}` socket 房间（typing/共享事件）以本地行为准,引擎会话不参与（事件
-发射器对 sess_ 不回写本地行——RF-16 L1-8）;消息级编辑/compact/fork/clone/
-share 对 `sess_` 会话 401（引擎线性树,不做 WebUI 侧分支工程——见完整方案 P2
+发射器对 sess_ 不回写本地行——RF-16 L1-8）;消息级编辑/删除、消息事件、
+compact/fork/clone 对 `sess_` 会话**早 404**（RV-23W E3-P2-5:中文 detail
+"引擎会话不支持该操作"随响应透传,前端菜单可达处给明确提示——修前落零行
+401 裸错;引擎线性树,不做 WebUI 侧消息级编辑与分支工程——见完整方案 P2
 "会话树多分支"悬置）。
 
 单测：`backend/tests/test_banyan_chat_adapter.py`（行投影形状/save no-op 零
@@ -257,7 +264,9 @@ ENABLE_ADMIN_ANALYTICS=false
 ```
 
 其余（DB `config` 表热生效的开关、i18n、任务后台收敛等）按审计 §11a 的 SQL
-清单写库即可，无需重启。当前运行实例启动脚本：`/tmp/run-webui.sh`。
+清单写库即可，无需重启。运行实例统一经引擎仓 `scripts/start-all.sh` 启动
+（engine/webui/sidecar 三进程与 env 注入一份收口，见引擎仓 README 与
+`docs/goal/`部署记录）——勿再使用临时启动脚本（如历史 `/tmp/run-webui.sh`）。
 
 **任务面模型（F3/D5）**：管理设置 `task.model.external` 建议填 `banyan-fast`——
 标题/标签/补全等后台任务自动轮烧引擎 fast 档，且走引擎无状态通道
