@@ -141,14 +141,14 @@
 	import { notifyBanyanDecision } from '$lib/utils/banyanNotify';
 
 	const banyanTaskEntries = [
-		{ id: 'registry', label: 'Registry', href: '/registry', prefix: '/registry' },
-		{ id: 'cards', label: 'Cards', href: '/cards', prefix: '/cards' },
-		{ id: 'audit', label: 'Audit', href: '/audit', prefix: '/audit' },
-		{ id: 'waves', label: 'Waves', href: '/waves', prefix: '/waves' },
-		{ id: 'tree', label: 'Tree', href: '/tree', prefix: '/tree' },
-		{ id: 'arch', label: 'Arch', href: '/arch', prefix: '/arch' },
-		{ id: 'inbox', label: 'Inbox', href: '/inbox', prefix: '/inbox' },
-		{ id: 'cal', label: 'Calendar', href: '/cal', prefix: '/cal' }
+		{ id: 'registry', label: '登记簿', href: '/registry', prefix: '/registry' },
+		{ id: 'cards', label: '审卡', href: '/cards', prefix: '/cards' },
+		{ id: 'audit', label: '审计', href: '/audit', prefix: '/audit' },
+		{ id: 'waves', label: '方案', href: '/waves', prefix: '/waves' },
+		{ id: 'tree', label: '会话树', href: '/tree', prefix: '/tree' },
+		{ id: 'arch', label: '架构', href: '/arch', prefix: '/arch' },
+		{ id: 'inbox', label: '信箱', href: '/inbox', prefix: '/inbox' },
+		{ id: 'cal', label: '日历', href: '/cal', prefix: '/cal' }
 	];
 
 	// v3 W2（V-10）：信箱条目挂待裁决数徽标。D15/F8 起事件驱动：inbox.* 帧到达即重取，
@@ -1438,7 +1438,7 @@
 					<SidebarSection
 						id="sidebar-banyan"
 						bind:open={showBanyanTasks}
-						name={$i18n.t('Tasks')}
+						name="任务"
 						dragAndDrop={false}
 					>
 						{#each banyanTaskEntries as entry (entry.href)}

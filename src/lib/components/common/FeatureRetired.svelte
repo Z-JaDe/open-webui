@@ -14,9 +14,6 @@
 		<div class="mt-2 text-sm text-gray-500 dark:text-gray-400">
 			该功能已按 banyan 方案退役：数据与配置由引擎统一管理，WebUI 不再提供此维护面。
 		</div>
-		<div class="mt-1 text-sm text-gray-400 dark:text-gray-600">
-			This section has been retired; its data and configuration are managed by the engine.
-		</div>
 		{#if code}
 			<div class="mt-3 text-xs text-gray-400 dark:text-gray-600">banyan {code}</div>
 		{/if}

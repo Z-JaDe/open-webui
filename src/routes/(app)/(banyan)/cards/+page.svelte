@@ -20,7 +20,7 @@
 	let resolvingId: string | null = null;
 
 	const banyanLayout: any = getContext('banyanLayout') ?? {};
-	banyanLayout.setHeader?.({ itemName: $i18n.t('Cards') });
+	banyanLayout.setHeader?.({ itemName: '审卡' });
 
 	const mockItems: BanyanCard[] = [
 		{
@@ -65,7 +65,7 @@
 		}
 		items = await getBanyanCards().catch((e) => {
 			error = `${e}`;
-			toast.error(`${$i18n.t('Failed to load cards')}: ${e}`);
+			toast.error(`审卡队列加载失败: ${e}`);
 			return [];
 		});
 		loaded = true;
@@ -79,7 +79,7 @@
 			}
 			card.status = decision;
 			items = [...items]; // 触发 pending/settled 重算
-			toast.success(decision === 'approved' ? $i18n.t('Card approved') : $i18n.t('Card rejected'));
+			toast.success(decision === 'approved' ? '卡片已批准' : '卡片已驳回');
 		} catch (e) {
 			toast.error(`${e}`);
 		} finally {
@@ -93,14 +93,14 @@
 	onMount(load);
 </script>
 
-<svelte:head><title>{$i18n.t('Cards')} · banyan</title></svelte:head>
+<svelte:head><title>审卡 · banyan</title></svelte:head>
 
 <BanyanPageNav />
 
 <div class="px-8 lg:px-28 xl:px-40 pb-16 pt-3 space-y-6">
 	{#if error}
 		<div class="rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-xs text-red-600 dark:text-red-400">
-			{$i18n.t('Engine unreachable via /banyan/api — start the engine or append ?mock=1 to preview with built-in sample data.')}
+			经 /banyan/api 无法连通引擎——请先启动引擎，或追加 ?mock=1 用内置样例数据预览。
 			<br />
 			{error}
 		</div>
@@ -108,7 +108,7 @@
 
 	<section>
 		<h2 class="text-sm font-medium text-black dark:text-white mb-2">
-			{$i18n.t('Pending review')}
+			待审
 			<span class="text-gray-400">({pending.length})</span>
 		</h2>
 		<div class="grid gap-2 md:grid-cols-2">
@@ -131,7 +131,7 @@
 							on:click={() => resolve(card, 'approved')}
 						>
 							<Check className="size-3.5" strokeWidth="2" />
-							{$i18n.t('Approve')}
+							批准
 						</button>
 						<button
 							type="button"
@@ -140,13 +140,13 @@
 							on:click={() => resolve(card, 'rejected')}
 						>
 							<XMark className="size-3.5" strokeWidth="2" />
-							{$i18n.t('Reject')}
+							驳回
 						</button>
 					</div>
 				</div>
 			{:else}
 				<div class="text-xs text-gray-400 dark:text-gray-500">
-					{loaded ? $i18n.t('No pending cards') : $i18n.t('Loading')}…
+					{loaded ? '暂无待审卡片' : '加载中'}…
 				</div>
 			{/each}
 		</div>
@@ -154,7 +154,7 @@
 
 	{#if settled.length}
 		<section>
-			<h2 class="text-sm font-medium text-black dark:text-white mb-2">{$i18n.t('Settled')}</h2>
+			<h2 class="text-sm font-medium text-black dark:text-white mb-2">已裁定</h2>
 			<div class="space-y-1">
 				{#each settled as card (card.id)}
 					<div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">

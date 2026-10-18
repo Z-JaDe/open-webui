@@ -12,13 +12,9 @@
 -->
 <script lang="ts">
 	import { getContext, createEventDispatcher } from 'svelte';
-	import type { Writable } from 'svelte/store';
-	import type { i18n as i18nType } from 'i18next';
 
 	import { mockBranchEvent } from './mock';
 	import type { BanyanBranchEvent } from './types';
-
-	const i18n = getContext<Writable<i18nType>>('i18n');
 	const dispatch = createEventDispatcher<{ switch: { id: string } }>();
 
 	export let event: BanyanBranchEvent | null = null;
@@ -36,9 +32,9 @@
 </script>
 
 {#if branchEvent && branchEvent.branches?.length > 1}
-	<div class="w-full flex items-center gap-1.5 flex-wrap" role="tablist" aria-label={$i18n.t('Conversation branches')}>
+	<div class="w-full flex items-center gap-1.5 flex-wrap" role="tablist" aria-label="会话分支">
 		<span class="text-[11px] text-gray-400 dark:text-gray-500 shrink-0">
-			{$i18n.t('Branches')}
+			分支
 		</span>
 		{#each branchEvent.branches as branch (branch.id)}
 			<button

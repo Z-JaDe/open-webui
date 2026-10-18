@@ -19,7 +19,7 @@
 	let typeFilter = '';
 
 	const banyanLayout: any = getContext('banyanLayout') ?? {};
-	banyanLayout.setHeader?.({ itemName: $i18n.t('Audit') });
+	banyanLayout.setHeader?.({ itemName: '审计' });
 
 	const mockItems: BanyanAuditEvent[] = [
 		{ id: 'e-0001', chat_id: 'chat-mock-77', type: 'plan.proposed', ts: Date.now() - 1000 * 720, payload: { plan_id: 'plan-mock-001', waves: 3 } },
@@ -45,7 +45,7 @@
 			limit: 300
 		}).catch((e) => {
 			error = `${e}`;
-			toast.error(`${$i18n.t('Failed to load audit events')}: ${e}`);
+			toast.error(`审计事件加载失败: ${e}`);
 			return [];
 		});
 		loaded = true;
@@ -83,7 +83,7 @@
 	onMount(load);
 </script>
 
-<svelte:head><title>{$i18n.t('Audit')} · banyan</title></svelte:head>
+<svelte:head><title>审计 · banyan</title></svelte:head>
 
 <BanyanPageNav />
 
@@ -91,12 +91,12 @@
 	<div class="flex items-center gap-2 flex-wrap mb-3">
 		<input
 			class="w-56 text-xs rounded-lg px-3 py-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-850 outline-none"
-			placeholder={$i18n.t('Filter by chat id')}
+			placeholder="按 chat id 过滤"
 			bind:value={chatIdFilter}
 		/>
 		<input
 			class="w-56 text-xs rounded-lg px-3 py-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-850 outline-none"
-			placeholder={$i18n.t('Filter by event type')}
+			placeholder="按事件类型过滤"
 			bind:value={typeFilter}
 		/>
 		<button
@@ -104,13 +104,13 @@
 			class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
 			on:click={load}
 		>
-			{$i18n.t('Refresh')}
+			刷新
 		</button>
 	</div>
 
 	{#if error}
 		<div class="mb-3 rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-xs text-red-600 dark:text-red-400">
-			{$i18n.t('Engine unreachable via /banyan/api — start the engine or append ?mock=1 to preview with built-in sample data.')}
+			经 /banyan/api 无法连通引擎——请先启动引擎，或追加 ?mock=1 用内置样例数据预览。
 			<br />
 			{error}
 		</div>
@@ -136,7 +136,7 @@
 			</div>
 		{:else}
 			<div class="px-3 py-8 text-center text-xs text-gray-400 dark:text-gray-500">
-				{loaded ? $i18n.t('No events match the filters') : $i18n.t('Loading')}…
+				{loaded ? '没有匹配过滤条件的事件' : '加载中'}…
 			</div>
 		{/each}
 	</div>

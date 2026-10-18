@@ -75,11 +75,11 @@
 								aria-label={$i18n.t('Back')}
 								on:click={() => goto('/registry')}
 								type="button"
-							>
-								{$i18n.t('Tasks')}
-							</button>
-						{:else}
-							<span class="min-w-fit px-1 text-sm select-none">{$i18n.t('Tasks')}</span>
+								>
+									任务
+								</button>
+							{:else}
+								<span class="min-w-fit px-1 text-sm select-none">任务</span>
 						{/if}
 						{#if itemName}
 							<span class="text-sm text-gray-300 dark:text-gray-800 px-2">/</span>

@@ -42,7 +42,7 @@
 	let acting = false;
 
 	const banyanLayout: any = getContext('banyanLayout') ?? {};
-	banyanLayout.setHeader?.({ itemName: $i18n.t('Calendar') });
+	banyanLayout.setHeader?.({ itemName: '日历' });
 
 	const isMock = () => new URLSearchParams(window.location.search).has('mock');
 
@@ -159,7 +159,7 @@
 		} catch (e) {
 			error = `${e}`;
 			events = [];
-			toast.error(`${$i18n.t('Failed to load calendar')}: ${e}`);
+			toast.error(`日历加载失败: ${e}`);
 		}
 		loaded = true;
 	};
@@ -197,13 +197,13 @@
 
 	const submitCreate = async () => {
 		if (!formTitle.trim()) {
-			toast.error($i18n.t('Title cannot be empty'));
+			toast.error('标题不能为空');
 			return;
 		}
 		let startTs = fromLocalInput(formStart);
 		let endTs = fromLocalInput(formEnd);
 		if (!startTs) {
-			toast.error($i18n.t('Invalid start time'));
+			toast.error('开始时间无效');
 			return;
 		}
 		if (!endTs || endTs <= startTs) endTs = startTs + 3600;
@@ -213,7 +213,7 @@
 				await createBanyanCalendarEvent({ title: formTitle.trim(), start_ts: startTs, end_ts: endTs });
 			}
 			modalMode = null;
-			toast.success($i18n.t('Event created'));
+			toast.success('日程已创建');
 			await refresh();
 		} catch (e) {
 			toast.error(`${e}`);
@@ -231,7 +231,7 @@
 			}
 			modalMode = null;
 			selectedEvent = null;
-			toast.success($i18n.t('Event cancelled'));
+			toast.success('日程已取消');
 			await refresh();
 		} catch (e) {
 			toast.error(`${e}`);
@@ -246,20 +246,20 @@
 	};
 
 	const MONTH_NAMES = [
-		'January',
-		'February',
-		'March',
-		'April',
-		'May',
-		'June',
-		'July',
-		'August',
-		'September',
-		'October',
-		'November',
-		'December'
+		'1月',
+		'2月',
+		'3月',
+		'4月',
+		'5月',
+		'6月',
+		'7月',
+		'8月',
+		'9月',
+		'10月',
+		'11月',
+		'12月'
 	];
-	$: headerText = `${MONTH_NAMES[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
+	$: headerText = `${currentDate.getFullYear()} 年 ${MONTH_NAMES[currentDate.getMonth()]}`;
 
 	const navigateMonth = (delta: number) => {
 		const d = new Date(currentDate);
@@ -290,7 +290,7 @@
 	});
 </script>
 
-<svelte:head><title>{$i18n.t('Calendar')} · banyan</title></svelte:head>
+<svelte:head><title>日历 · banyan</title></svelte:head>
 
 <BanyanPageNav />
 
@@ -299,7 +299,7 @@
 		<div
 			class="mb-3 rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-xs text-red-600 dark:text-red-400"
 		>
-			{$i18n.t('Engine unreachable via /banyan/api — start the engine or append ?mock=1 to preview with built-in sample data.')}
+			经 /banyan/api 无法连通引擎——请先启动引擎，或追加 ?mock=1 用内置样例数据预览。
 			<br />
 			{error}
 		</div>
@@ -314,7 +314,7 @@
 			type="button"
 			class="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-850 transition"
 			on:click={() => navigateMonth(-1)}
-			aria-label={$i18n.t('Previous')}
+			aria-label="上个月"
 		>
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
@@ -331,7 +331,7 @@
 			type="button"
 			class="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-850 transition"
 			on:click={() => navigateMonth(1)}
-			aria-label={$i18n.t('Next')}
+			aria-label="下个月"
 		>
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
@@ -349,14 +349,14 @@
 			class="text-xs px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-850 transition text-gray-500 dark:text-gray-400"
 			on:click={goToToday}
 		>
-			{$i18n.t('Today')}
+			今天
 		</button>
 		<button
 			type="button"
 			class="ml-auto rounded-lg bg-gray-50 px-2.5 py-1 text-xs text-gray-900 transition ring-1 ring-gray-200 hover:bg-gray-100 dark:bg-gray-850 dark:text-gray-100 dark:ring-gray-800 dark:hover:bg-gray-800"
 			on:click={() => openCreate(Math.floor(Date.now() / 1000))}
 		>
-			{$i18n.t('Create')}
+			新建
 		</button>
 	</div>
 
@@ -379,18 +379,18 @@
 	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
 		<div class="w-80 rounded-xl bg-white dark:bg-gray-900 p-4 shadow-xl space-y-3">
 			{#if modalMode === 'create'}
-				<div class="text-sm font-medium text-black dark:text-white">{$i18n.t('New event')}</div>
+				<div class="text-sm font-medium text-black dark:text-white">新日程</div>
 				<input
 					class="w-full rounded-lg px-3 py-2 text-sm bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 outline-none"
-					placeholder={$i18n.t('Title')}
+					placeholder="标题"
 					bind:value={formTitle}
 				/>
 				<label class="block text-[11px] text-gray-500 dark:text-gray-400">
-					{$i18n.t('Start')}
+					开始
 					<input type="datetime-local" class="mt-1 w-full rounded-lg px-3 py-2 text-sm bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 outline-none" bind:value={formStart} />
 				</label>
 				<label class="block text-[11px] text-gray-500 dark:text-gray-400">
-					{$i18n.t('End')}
+					结束
 					<input type="datetime-local" class="mt-1 w-full rounded-lg px-3 py-2 text-sm bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 outline-none" bind:value={formEnd} />
 				</label>
 				<div class="flex items-center justify-end gap-2 pt-1">
@@ -399,7 +399,7 @@
 						class="px-3 py-1.5 text-xs rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
 						on:click={() => (modalMode = null)}
 					>
-						{$i18n.t('Cancel')}
+						取消
 					</button>
 					<button
 						type="button"
@@ -407,7 +407,7 @@
 						disabled={acting}
 						on:click={submitCreate}
 					>
-						{$i18n.t('Create')}
+						新建
 					</button>
 				</div>
 			{:else if selectedEvent}
@@ -426,7 +426,7 @@
 						class="px-3 py-1.5 text-xs rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
 						on:click={() => (modalMode = null)}
 					>
-						{$i18n.t('Close')}
+						关闭
 					</button>
 					<button
 						type="button"
@@ -434,7 +434,7 @@
 						disabled={acting}
 						on:click={deleteEvent}
 					>
-						{$i18n.t('Delete')}
+						删除
 					</button>
 				</div>
 			{/if}

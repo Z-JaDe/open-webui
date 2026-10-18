@@ -13,16 +13,12 @@
 	mock：`<SubagentCard mock />` 渲染内置样例子代理。
 -->
 <script lang="ts">
-	import { getContext, createEventDispatcher, onDestroy } from 'svelte';
-	import type { Writable } from 'svelte/store';
-	import type { i18n as i18nType } from 'i18next';
+	import { createEventDispatcher, onDestroy } from 'svelte';
 
 	import { toast } from 'svelte-sonner';
 
 	import { mockSubagentEvents } from './mock';
 	import { formatDuration, subagentKey, type BanyanSubagentEvent } from './types';
-
-	const i18n = getContext<Writable<i18nType>>('i18n');
 	const dispatch = createEventDispatcher<{ stop: BanyanSubagentEvent }>();
 
 	/** 按 subagentKey（引擎线格式 work_id 优先）upsert 后的子代理事件列表（首现顺序） */
@@ -78,7 +74,7 @@
 		dispatch('stop', card);
 		if (!mock) {
 			// 停止指令经引擎 API 下发；这里仅提示，正本状态以引擎回流为准
-			toast.info($i18n.t('Stop requested for {{name}}', { name: card.title ?? subagentKey(card) }));
+			toast.info(`已请求停止: ${card.title ?? subagentKey(card)}`);
 		}
 	};
 
@@ -123,9 +119,9 @@
 						<a
 							class="text-[11px] text-blue-600 dark:text-blue-400 hover:underline"
 							href="/audit?session_id={encodeURIComponent(sessionLink(card))}"
-						>
-							{$i18n.t('Open subagent session')}
-						</a>
+							>
+								打开子代理会话
+							</a>
 					{/if}
 					{#if card.status === 'running'}
 						<button
@@ -133,7 +129,7 @@
 							class="ml-auto text-[11px] px-2 py-0.5 rounded-md border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
 							on:click={() => stopHandler(card)}
 						>
-							{$i18n.t('Stop')}
+							停止
 						</button>
 					{/if}
 				</div>

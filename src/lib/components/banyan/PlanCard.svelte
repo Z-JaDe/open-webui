@@ -52,13 +52,13 @@
 			dispatch('resolve', { decision });
 			toast.success(
 				decision === 'approved'
-					? $i18n.t('Plan approved')
+					? '方案已批准'
 					: decision === 'rejected'
-						? $i18n.t('Plan rejected')
-						: $i18n.t('Switched to alternative plan')
+						? '方案已驳回'
+						: '已切换到备选方案'
 			);
 		} catch (error) {
-			toast.error(`${$i18n.t('Failed to resolve plan')}: ${error}`);
+			toast.error(`方案裁决失败: ${error}`);
 		} finally {
 			resolving = false;
 		}
@@ -83,7 +83,7 @@
 				</div>
 				<div class="min-w-0">
 					<div class="text-sm font-medium text-black dark:text-white truncate">
-						{plan.title ?? $i18n.t('Execution Plan')}
+						{plan.title ?? '执行方案'}
 					</div>
 					<div class="text-[11px] text-gray-500 dark:text-gray-400 truncate">
 						{plan.plan_id}
@@ -96,10 +96,10 @@
 		</div>
 
 		{#if plan.hypothesis}
-			<div class="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
-				<span class="font-medium text-gray-700 dark:text-gray-200">{$i18n.t('Hypothesis')}:</span>
-				{plan.hypothesis}
-			</div>
+				<div class="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
+					<span class="font-medium text-gray-700 dark:text-gray-200">核心假设:</span>
+					{plan.hypothesis}
+				</div>
 		{/if}
 
 		<div class="space-y-1.5">
@@ -109,7 +109,7 @@
 						W{wave.index}
 					</span>
 					<div class="min-w-0">
-						<span class="text-gray-700 dark:text-gray-200">{wave.title ?? $i18n.t('Wave')} {wave.index}</span>
+						<span class="text-gray-700 dark:text-gray-200">{wave.title ?? `波次 ${wave.index}`}</span>
 						<span class="text-gray-400 dark:text-gray-500">
 							· {wave.tasks.map((task) => task.title).join($i18n.t('、'))}
 							{#if wave.depends_on?.length}
@@ -124,7 +124,7 @@
 		<div class="grid gap-2 md:grid-cols-3 text-xs">
 			{#if plan.acceptance?.length}
 				<div class="rounded-lg bg-black/[0.03] dark:bg-white/[0.04] p-2">
-					<div class="font-medium text-gray-600 dark:text-gray-300 mb-1">{$i18n.t('Acceptance')}</div>
+					<div class="font-medium text-gray-600 dark:text-gray-300 mb-1">验收标准</div>
 					<ul class="space-y-0.5 text-gray-500 dark:text-gray-400 list-disc list-inside">
 						{#each plan.acceptance as item}
 							<li>{item}</li>
@@ -134,7 +134,7 @@
 			{/if}
 			{#if plan.risks?.length}
 				<div class="rounded-lg bg-black/[0.03] dark:bg-white/[0.04] p-2">
-					<div class="font-medium text-gray-600 dark:text-gray-300 mb-1">{$i18n.t('Risks')}</div>
+					<div class="font-medium text-gray-600 dark:text-gray-300 mb-1">风险</div>
 					<ul class="space-y-0.5 text-gray-500 dark:text-gray-400 list-disc list-inside">
 						{#each plan.risks as item}
 							<li>{item}</li>
@@ -144,7 +144,7 @@
 			{/if}
 			{#if plan.rollback}
 				<div class="rounded-lg bg-black/[0.03] dark:bg-white/[0.04] p-2">
-					<div class="font-medium text-gray-600 dark:text-gray-300 mb-1">{$i18n.t('Rollback')}</div>
+					<div class="font-medium text-gray-600 dark:text-gray-300 mb-1">回滚</div>
 					<div class="text-gray-500 dark:text-gray-400">{plan.rollback}</div>
 				</div>
 			{/if}
@@ -157,7 +157,7 @@
 					class="text-blue-600 dark:text-blue-400 hover:underline"
 					on:click={() => (showAltOption = !showAltOption)}
 				>
-					{showAltOption ? $i18n.t('Hide alternative') : $i18n.t('Show alternative plan (B)')}
+					{showAltOption ? '收起备选' : '查看备选方案（B）'}
 				</button>
 				{#if showAltOption}
 					<div class="mt-1 rounded-lg border border-blue-500/20 bg-blue-500/5 p-2 text-gray-600 dark:text-gray-300">
@@ -169,7 +169,7 @@
 
 		{#if plan.status === 'pending'}
 			<div class="flex items-center gap-2 pt-0.5">
-				<Tooltip content={$i18n.t('Approve and start execution')}>
+				<Tooltip content="批准并开始执行">
 					<button
 						type="button"
 						class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200 disabled:opacity-50 transition"
@@ -177,10 +177,10 @@
 						on:click={() => resolveHandler('approved')}
 					>
 						<Check className="size-3.5" strokeWidth="2" />
-						{$i18n.t('Approve')}
+						批准
 					</button>
 				</Tooltip>
-				<Tooltip content={$i18n.t('Reject this plan')}>
+				<Tooltip content="驳回该方案">
 					<button
 						type="button"
 						class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 transition"
@@ -188,18 +188,18 @@
 						on:click={() => resolveHandler('rejected')}
 					>
 						<XMark className="size-3.5" strokeWidth="2" />
-						{$i18n.t('Reject')}
+						驳回
 					</button>
 				</Tooltip>
 				{#if plan.alt_option}
-					<Tooltip content={$i18n.t('Choose the alternative plan')}>
+					<Tooltip content="选择备选方案">
 						<button
 							type="button"
 							class="px-3 py-1.5 text-xs font-medium rounded-lg border border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 disabled:opacity-50 transition"
 							disabled={resolving}
 							on:click={() => resolveHandler('revised')}
 						>
-							{$i18n.t('Choose B')}
+							选 B
 						</button>
 					</Tooltip>
 				{/if}

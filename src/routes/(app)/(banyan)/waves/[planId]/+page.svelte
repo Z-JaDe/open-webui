@@ -27,7 +27,7 @@
 
 	const banyanLayout: any = getContext('banyanLayout') ?? {};
 	$: banyanLayout.setHeader?.({
-		itemName: `${$i18n.t('Waves')} · ${$page.params.planId}`
+		itemName: `方案 · ${$page.params.planId}`
 	});
 
 	const mockSnapshot: BanyanPlanSnapshot = {
@@ -112,7 +112,7 @@
 		}
 		snapshot = await getBanyanPlan($page.params.planId).catch((e) => {
 			error = `${e}`;
-			toast.error(`${$i18n.t('Failed to load plan')}: ${e}`);
+			toast.error(`方案加载失败: ${e}`);
 			return null;
 		});
 		loaded = true;
@@ -129,12 +129,12 @@
 	});
 </script>
 
-<svelte:head><title>{$i18n.t('Waves')} · banyan</title></svelte:head>
+<svelte:head><title>方案 · banyan</title></svelte:head>
 
 <div class="px-8 lg:px-28 xl:px-40 pb-16 pt-3 space-y-4">
 	{#if error}
 		<div class="rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-xs text-red-600 dark:text-red-400">
-			{$i18n.t('Engine unreachable via /banyan/api — start the engine or append ?mock=1 to preview with built-in sample data.')}
+			经 /banyan/api 无法连通引擎——请先启动引擎，或追加 ?mock=1 用内置样例数据预览。
 			<br />
 			{error}
 		</div>
@@ -147,7 +147,7 @@
 			<WaveBoard events={snapshot.wave_updates} plan={snapshot.plan} on:select={(e) => (selected = e.detail)} />
 
 			<div class="rounded-xl border border-gray-100 dark:border-gray-850 bg-gray-50 dark:bg-gray-900/40 p-3 space-y-2">
-				<div class="text-sm font-medium text-black dark:text-white">{$i18n.t('Task Inspector')}</div>
+				<div class="text-sm font-medium text-black dark:text-white">任务检查器</div>
 				{#if selected}
 					<div class="space-y-1.5 text-xs">
 						<div>
@@ -155,18 +155,18 @@
 							<span class="font-mono text-gray-700 dark:text-gray-200">{selected.task_id}</span>
 						</div>
 						<div>
-							<span class="text-gray-400">{$i18n.t('Title')}:</span>
+							<span class="text-gray-400">标题:</span>
 							<span class="text-gray-700 dark:text-gray-200">{selected.title ?? '-'}</span>
 						</div>
 						<div>
-							<span class="text-gray-400">{$i18n.t('Status')}:</span>
+							<span class="text-gray-400">状态:</span>
 							<span class="text-gray-700 dark:text-gray-200">
 								{$i18n.t(BANYAN_TASK_STATUS_LABEL[selected.status])}
 							</span>
 						</div>
 						{#if selected.deps?.length}
 							<div>
-								<span class="text-gray-400">{$i18n.t('Depends on')}:</span>
+								<span class="text-gray-400">依赖:</span>
 								<span class="font-mono text-gray-700 dark:text-gray-200">{selected.deps.join(', ')}</span>
 							</div>
 						{/if}
@@ -178,14 +178,14 @@
 					</div>
 				{:else}
 					<div class="text-xs text-gray-400 dark:text-gray-500">
-						{$i18n.t('Click a task cell to inspect it')}
+						点击任务格查看详情
 					</div>
 				{/if}
 			</div>
 		</div>
 	{:else}
 		<div class="text-xs text-gray-400 dark:text-gray-500">
-			{loaded ? $i18n.t('Plan not found') : $i18n.t('Loading')}…
+			{loaded ? '未找到方案' : '加载中'}…
 		</div>
 	{/if}
 </div>

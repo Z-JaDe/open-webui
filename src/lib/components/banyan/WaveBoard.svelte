@@ -116,17 +116,17 @@
 <div class="rounded-xl border border-gray-100 dark:border-gray-850 bg-gray-50 dark:bg-gray-900/40 p-3 w-full space-y-2">
 	<div class="flex items-center justify-between gap-2 flex-wrap">
 		<div class="text-sm font-medium text-black dark:text-white">
-			{$i18n.t('Wave Board')}
+			波次看板
 			{#if sourcePlan?.title}
 				<span class="text-gray-400 dark:text-gray-500 font-normal">· {sourcePlan.title}</span>
 			{/if}
 		</div>
 		<div class="flex items-center gap-2 text-[11px] text-gray-500 dark:text-gray-400">
-			<span>{$i18n.t('Done')} {counts.done}</span>
-			<span>{$i18n.t('Running')} {counts.running}</span>
-			<span>{$i18n.t('Pending')} {counts.pending}</span>
+			<span>完成 {counts.done}</span>
+			<span>执行中 {counts.running}</span>
+			<span>排队 {counts.pending}</span>
 			{#if counts.failed + counts.blocked > 0}
-				<span class="text-red-600 dark:text-red-400">{$i18n.t('Failed/Blocked')} {counts.failed + counts.blocked}</span>
+				<span class="text-red-600 dark:text-red-400">失败/受阻 {counts.failed + counts.blocked}</span>
 			{/if}
 		</div>
 	</div>
@@ -166,10 +166,10 @@
 					{/each}
 				</div>
 			</div>
-		{:else}
-			<div class="text-xs text-gray-400 dark:text-gray-500 py-2">
-				{$i18n.t('No wave updates yet')}
-			</div>
-		{/each}
+			{:else}
+				<div class="text-xs text-gray-400 dark:text-gray-500 py-2">
+					暂无波次更新
+				</div>
+			{/each}
 	</div>
 </div>

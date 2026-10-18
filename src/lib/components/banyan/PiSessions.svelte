@@ -6,12 +6,7 @@
 -->
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { getContext } from 'svelte';
-	import type { Writable } from 'svelte/store';
-	import type { i18n as i18nType } from 'i18next';
 	import { BANYAN_API_BASE_URL } from '$lib/apis/banyan';
-
-	const i18n = getContext<Writable<i18nType>>('i18n');
 
 	type PiSession = {
 		id: string;
@@ -107,11 +102,11 @@
 
 <div class="text-xs">
 	{#if !loaded}
-		<div class="text-gray-500 dark:text-gray-400">{$i18n.t('Loading…')}</div>
+		<div class="text-gray-500 dark:text-gray-400">加载中…</div>
 	{:else if error && sessions.length === 0}
-		<div class="text-gray-500 dark:text-gray-400">{$i18n.t('Engine unreachable')}: {error}</div>
+		<div class="text-gray-500 dark:text-gray-400">引擎不可达: {error}</div>
 	{:else if sessions.length === 0}
-		<div class="text-gray-500 dark:text-gray-400">{$i18n.t('No Pi sessions')}</div>
+		<div class="text-gray-500 dark:text-gray-400">无 Pi 会话</div>
 	{:else}
 		<ul class="divide-y divide-gray-100 dark:divide-gray-850">
 			{#each sessions as session (session.id)}
@@ -128,7 +123,7 @@
 									? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
 									: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}"
 						>
-							{session.status || $i18n.t('idle')}
+							{session.status || '空闲'}
 						</span>
 						<span class="font-mono text-gray-800 dark:text-gray-200 truncate">{session.id}</span>
 						{#if workspaceTail(session)}
@@ -143,9 +138,9 @@
 					{#if expanded === session.id}
 						<div class="py-1 pl-3 border-l border-gray-100 dark:border-gray-850 ml-2">
 							{#if treeLoading}
-								<div class="text-gray-400">{$i18n.t('Loading…')}</div>
+								<div class="text-gray-400">加载中…</div>
 							{:else if tree.length === 0}
-								<div class="text-gray-400">{$i18n.t('Empty')}</div>
+								<div class="text-gray-400">空</div>
 							{:else}
 								{#each tree as node}
 									<div class="flex gap-1.5 py-0.5" style="padding-left: {node.depth * 12}px">

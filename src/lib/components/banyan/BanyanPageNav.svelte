@@ -11,11 +11,11 @@
 	const i18n = getContext<Writable<i18nType>>('i18n');
 
 	export let tabs = [
-		{ id: 'registry', label: 'Registry', href: '/registry' },
-		{ id: 'cards', label: 'Cards', href: '/cards' },
-		{ id: 'audit', label: 'Audit', href: '/audit' },
-		{ id: 'inbox', label: 'Inbox', href: '/inbox' },
-		{ id: 'cal', label: 'Calendar', href: '/cal' }
+		{ id: 'registry', label: '登记簿', href: '/registry' },
+		{ id: 'cards', label: '审卡', href: '/cards' },
+		{ id: 'audit', label: '审计', href: '/audit' },
+		{ id: 'inbox', label: '信箱', href: '/inbox' },
+		{ id: 'cal', label: '日历', href: '/cal' }
 	];
 
 	$: active = $page.url.pathname;

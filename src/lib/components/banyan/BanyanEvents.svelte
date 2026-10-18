@@ -12,9 +12,6 @@
 	  渲染顺序（正文上方）：TreeSwitcher → PlanCard → WaveBoard → ToolTimeline → SubagentCard。
 -->
 <script lang="ts">
-	import { getContext } from 'svelte';
-	import type { Writable } from 'svelte/store';
-	import type { i18n as i18nType } from 'i18next';
 	import { toast } from 'svelte-sonner';
 
 	import PlanCard from './PlanCard.svelte';
@@ -35,8 +32,6 @@
 		BanyanToolEvent,
 		BanyanWaveUpdateEvent
 	} from './types';
-
-	const i18n = getContext<Writable<i18nType>>('i18n');
 
 	export let events: BanyanEvent[] = [];
 	export let chatId = '';
@@ -91,9 +86,9 @@
 		if (mock || !chatId) return;
 		try {
 			await switchBanyanTreeNode(chatId, id);
-			toast.success($i18n.t('Switched branch'));
+			toast.success('已切换分支');
 		} catch (error) {
-			toast.error(`${$i18n.t('Failed to switch branch')}: ${error}`);
+			toast.error(`分支切换失败: ${error}`);
 		}
 	};
 
@@ -105,7 +100,7 @@
 			// SubagentCard.stopHandler 统一出(不双 toast)。
 			await stopBanyanSubagent(subagent.work_id ?? subagent.subagent_id);
 		} catch (error) {
-			toast.error(`${$i18n.t('Failed to stop subagent')}: ${error}`);
+			toast.error(`子代理停止失败: ${error}`);
 		}
 	};
 </script>

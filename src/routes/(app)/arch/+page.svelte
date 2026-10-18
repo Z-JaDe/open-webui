@@ -30,7 +30,7 @@
 </script>
 
 <svelte:head>
-	<title>{$i18n.t('Architecture')}</title>
+	<title>架构</title>
 </svelte:head>
 
 <div class="flex flex-col h-full min-h-0">
@@ -43,7 +43,7 @@
 					B
 				</div>
 				<h1 class="text-xl font-semibold text-gray-900 dark:text-white">
-					{$i18n.t('Architecture')}
+					架构
 				</h1>
 			</div>
 
@@ -52,16 +52,14 @@
 				<div
 					class="rounded-xl border border-gray-100 dark:border-gray-850 p-4 space-y-2 text-sm"
 				>
-					<div class="font-medium text-black dark:text-white">{$i18n.t('System')}</div>
+					<div class="font-medium text-black dark:text-white">系统</div>
 					<p class="text-gray-500 dark:text-gray-400">
-						{$i18n.t(
-							'Three processes: engine (:8000, orchestration, storage of record, K1 event stream) · sidecar (:8100, skill projection) · WebUI (:8080, identity and presentation).'
-						)}
+						三个进程：引擎（:8000，编排、存储正本、K1 事件流）· sidecar（:8100，技能投影）· WebUI（:8080，身份与呈现）。
 					</p>
 					<p class="text-gray-500 dark:text-gray-400">
-						{$i18n.t('Storage root (BANYAN_HOME)')}:
+						存储根（BANYAN_HOME）：
 						<span class="break-all font-mono text-xs text-gray-700 dark:text-gray-300">
-							{home || $i18n.t('Engine unreachable')}
+							{home || '引擎不可达'}
 						</span>
 					</p>
 				</div>
@@ -71,7 +69,7 @@
 					data-testid="banyan-arch-status"
 				>
 					<div class="text-sm font-medium text-black dark:text-white mb-3">
-						{$i18n.t('Engine status')}
+						引擎状态
 					</div>
 					<BanyanEngineStatus />
 				</div>
@@ -89,7 +87,7 @@
 				data-testid="banyan-pi-sessions"
 			>
 				<div class="text-sm font-medium text-black dark:text-white mb-3">
-					{$i18n.t('Pi sessions (sidecar, read-only)')}
+					Pi 会话（sidecar，只读）
 				</div>
 				<PiSessions />
 			</div>

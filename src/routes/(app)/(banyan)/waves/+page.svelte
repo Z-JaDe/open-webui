@@ -19,7 +19,7 @@
 	const i18n = getContext<Writable<i18nType>>('i18n');
 
 	const banyanLayout: any = getContext('banyanLayout') ?? {};
-	banyanLayout.setHeader?.({ itemName: $i18n.t('Waves') });
+	banyanLayout.setHeader?.({ itemName: '方案' });
 
 	let loaded = false;
 	let error: string | null = null;
@@ -28,12 +28,12 @@
 	// 状态分组(D2):等待批准(含 open 初始态)/运行中/被拦截/已完成/已驳回|其他
 	// (rejected|revised|orphaned 终态留史,归"其他"组;行永久可查)。
 	const GROUPS: { label: string; statuses: string[]; dot: string }[] = [
-		{ label: 'Awaiting approval', statuses: ['open', 'pending_approval'], dot: 'bg-amber-500' },
-		{ label: 'Running', statuses: ['running'], dot: 'bg-blue-500' },
-		{ label: 'Blocked', statuses: ['blocked'], dot: 'bg-red-500' },
-		{ label: 'Finished', statuses: ['finished'], dot: 'bg-green-500' },
+		{ label: '等待批准', statuses: ['open', 'pending_approval'], dot: 'bg-amber-500' },
+		{ label: '运行中', statuses: ['running'], dot: 'bg-blue-500' },
+		{ label: '被拦截', statuses: ['blocked'], dot: 'bg-red-500' },
+		{ label: '已完成', statuses: ['finished'], dot: 'bg-green-500' },
 		{
-			label: 'Rejected / others',
+			label: '已驳回及其他',
 			statuses: ['rejected', 'revised', 'orphaned'],
 			dot: 'bg-gray-400'
 		}
@@ -116,7 +116,7 @@
 	});
 </script>
 
-<svelte:head><title>{$i18n.t('Waves')} · banyan</title></svelte:head>
+<svelte:head><title>方案 · banyan</title></svelte:head>
 
 <BanyanPageNav />
 
@@ -126,7 +126,7 @@
 			<div
 				class="rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-xs text-red-600 dark:text-red-400"
 			>
-				{$i18n.t('Engine unreachable via /banyan/api — start the engine or append ?mock=1 to preview with built-in sample data.')}
+				经 /banyan/api 无法连通引擎——请先启动引擎，或追加 ?mock=1 用内置样例数据预览。
 				<br />
 				{error}
 			</div>
@@ -162,20 +162,20 @@
 										<span
 											class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-500/10 text-red-600 dark:text-red-400"
 										>
-											{p.tasks.failed} {$i18n.t('failed')}
+											失败 {p.tasks.failed}
 										</span>
 									{/if}
 									{#if p.tasks.skipped > 0}
 										<span
 											class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-500/10 text-gray-500 dark:text-gray-400"
 										>
-											{p.tasks.skipped} {$i18n.t('skipped')}
+											跳过 {p.tasks.skipped}
 										</span>
 									{/if}
 									<span
 										class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-black/[0.05] dark:bg-white/[0.08] text-gray-600 dark:text-gray-300"
 									>
-										{p.tasks.done}/{p.tasks.total} {$i18n.t('tasks')}
+										任务 {p.tasks.done}/{p.tasks.total}
 									</span>
 								</div>
 							</div>
@@ -187,14 +187,14 @@
 
 		{#if loaded && plans.length === 0 && !error}
 			<div class="text-xs text-gray-400 dark:text-gray-500">
-				{$i18n.t('No plans yet — ask the butler in chat to draft one.')}
+				暂无方案——在对话里让管家起草一个。
 			</div>
 		{/if}
 
 		<!-- 手输 id 入口(折叠保留) -->
 		<details class="max-w-md">
 			<summary class="cursor-pointer text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 select-none">
-				{$i18n.t('Open by plan id')}
+				按方案 id 打开
 			</summary>
 			<form
 				class="mt-2 flex items-center gap-2"
@@ -212,7 +212,7 @@
 					type="submit"
 					class="px-3 py-2 text-xs font-medium rounded-lg bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200 transition"
 				>
-					{$i18n.t('Open')}
+					打开
 				</button>
 			</form>
 		</details>

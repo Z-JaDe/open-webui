@@ -33,12 +33,12 @@
 	let actingId: string | null = null;
 
 	const banyanLayout: any = getContext('banyanLayout') ?? {};
-	banyanLayout.setHeader?.({ itemName: $i18n.t('Inbox') });
+	banyanLayout.setHeader?.({ itemName: '信箱' });
 
 	const TABS: { id: BanyanInboxCategory; label: string }[] = [
-		{ id: 'decision', label: 'Pending decisions' },
-		{ id: 'done', label: 'Completed' },
-		{ id: 'notice', label: 'Notices' }
+		{ id: 'decision', label: '待裁决' },
+		{ id: 'done', label: '完成' },
+		{ id: 'notice', label: '通知' }
 	];
 
 	// 各 tab 拉取的状态集(引擎 status 逗号多值逐个拉取;done/notice 需含已读与已裁决项;
@@ -148,7 +148,7 @@
 		} catch (e) {
 			error = `${e}`;
 			items = [];
-			toast.error(`${$i18n.t('Failed to load inbox')}: ${e}`);
+			toast.error(`信箱加载失败: ${e}`);
 		}
 		loaded = true;
 	};
@@ -168,7 +168,7 @@
 			} else {
 				item.status = 'resolved';
 			}
-			toast.success(decision === 'approve' ? $i18n.t('Approved') : $i18n.t('Rejected'));
+			toast.success(decision === 'approve' ? '已批准' : '已驳回');
 			await refresh(); // 处置后刷新列表（V-5：resolve 按 ref_kind 路由后项离开 open 集）
 		} catch (e) {
 			toast.error(`${e}`);
@@ -201,7 +201,7 @@
 			} else {
 				item.status = 'archived';
 			}
-			toast.success($i18n.t('Archived'));
+			toast.success('已归档');
 			await refresh();
 		} catch (e) {
 			toast.error(`${e}`);
@@ -211,11 +211,11 @@
 	};
 
 	const KIND_LABELS: Record<string, string> = {
-		blocked_escalation: 'Blocked escalation',
-		principle_conflict: 'Principle conflict',
-		delivery_signoff: 'Delivery signoff',
-		plan_completed: 'Plan completed',
-		notice: 'Notice'
+		blocked_escalation: '阻塞升级',
+		principle_conflict: '原则冲突',
+		delivery_signoff: '交付待验收',
+		plan_completed: '方案完成',
+		notice: '通知'
 	};
 
 	const fmtTime = (ms?: number) => (ms ? new Date(ms).toLocaleString() : '');
@@ -234,7 +234,7 @@
 	});
 </script>
 
-<svelte:head><title>{$i18n.t('Inbox')} · banyan</title></svelte:head>
+<svelte:head><title>信箱 · banyan</title></svelte:head>
 
 <BanyanPageNav />
 
@@ -243,7 +243,7 @@
 		<div
 			class="rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-xs text-red-600 dark:text-red-400"
 		>
-			{$i18n.t('Engine unreachable via /banyan/api — start the engine or append ?mock=1 to preview with built-in sample data.')}
+			经 /banyan/api 无法连通引擎——请先启动引擎，或追加 ?mock=1 用内置样例数据预览。
 			<br />
 			{error}
 		</div>
@@ -276,7 +276,7 @@
 	<div class="space-y-2">
 		{#if activeTab === 'decision' && pendingItems.length}
 			<div class="text-xs font-semibold text-gray-500 dark:text-gray-400">
-				{$i18n.t('Pending')} · {pendingItems.length}
+				待处置 · {pendingItems.length}
 			</div>
 		{/if}
 		{#each pendingItems as item (item.id)}
@@ -303,7 +303,7 @@
 								<span
 									class="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-500/10 text-red-600 dark:text-red-400"
 								>
-									{$i18n.t('Escalated')}
+									{$i18n.t('已升级')}
 								</span>
 							{/if}
 							<div class="text-sm font-medium text-black dark:text-white">{item.title}</div>
@@ -345,7 +345,7 @@
 								on:click={() => resolve(item, 'approve')}
 							>
 								<Check className="size-3.5" strokeWidth="2" />
-								{$i18n.t('Approve expansion')}
+								批准扩围
 							</button>
 							<button
 								type="button"
@@ -354,7 +354,7 @@
 								on:click={() => resolve(item, 'reject')}
 							>
 								<XMark className="size-3.5" strokeWidth="2" />
-								{$i18n.t('Reject')}
+								驳回
 							</button>
 						{/if}
 						{#if item.status === 'open'}
@@ -364,7 +364,7 @@
 								disabled={actingId === item.id}
 								on:click={() => markRead(item)}
 							>
-								{$i18n.t('Mark as read')}
+								{$i18n.t('标记已读')}
 							</button>
 						{/if}
 						{#if item.status !== 'archived'}
@@ -374,7 +374,7 @@
 								disabled={actingId === item.id}
 								on:click={() => archive(item)}
 							>
-								{$i18n.t('Archive')}
+								{$i18n.t('归档')}
 							</button>
 						{/if}
 					</div>
@@ -383,7 +383,7 @@
 		{:else}
 			{#if !(activeTab === 'decision' && resolvedItems.length)}
 				<div class="text-xs text-gray-400 dark:text-gray-500">
-					{loaded ? $i18n.t('Nothing here') : `${$i18n.t('Loading')}…`}
+					{loaded ? '暂无内容' : '加载中…'}
 				</div>
 			{/if}
 		{/each}
@@ -391,7 +391,7 @@
 		<!-- 已处置组(F2/D3):resolved 不再消失——只读+resolution 摘要+归档 -->
 		{#if activeTab === 'decision' && resolvedItems.length}
 			<div class="pt-3 text-xs font-semibold text-gray-500 dark:text-gray-400">
-				{$i18n.t('Resolved')} · {resolvedItems.length}
+				已处置 · {resolvedItems.length}
 			</div>
 			{#each resolvedItems as item (item.id)}
 				<div
@@ -407,7 +407,7 @@
 							<span
 								class="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-500/10 text-green-600 dark:text-green-400"
 							>
-								{$i18n.t('Resolved')}
+								已处置
 							</span>
 							<div class="text-sm font-medium text-gray-600 dark:text-gray-300 truncate">
 								{item.title}
@@ -428,7 +428,7 @@
 						<div
 							class="text-[11px] text-gray-500 dark:text-gray-400 rounded-lg bg-black/[0.03] dark:bg-white/[0.04] px-2 py-1.5"
 						>
-							{$i18n.t('Decision')}: {item.resolution.decision ?? '—'}{item.resolution.note
+							裁决: {item.resolution.decision ?? '—'}{item.resolution.note
 								? ` · ${item.resolution.note}`
 								: ''}
 						</div>
@@ -447,7 +447,7 @@
 								disabled={actingId === item.id}
 								on:click={() => archive(item)}
 							>
-								{$i18n.t('Archive')}
+								{$i18n.t('归档')}
 							</button>
 						{/if}
 					</div>

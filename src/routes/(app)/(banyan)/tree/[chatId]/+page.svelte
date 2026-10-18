@@ -6,14 +6,10 @@
 	// 原则，摘按钮保留只读树；分支切换经消息流 TreeSwitcher 恢复对端后再上。）
 	// story 开关：?mock=1 → 内置样例数据（不请求引擎）。
 	import { onMount, getContext } from 'svelte';
-	import type { Writable } from 'svelte/store';
 	import { page } from '$app/stores';
 	import { toast } from 'svelte-sonner';
 
-	import type i18nType from '$lib/i18n';
 	import { getBanyanTree, type BanyanTreeSnapshot } from '$lib/apis/banyan';
-
-	const i18n = getContext<Writable<i18nType>>('i18n');
 
 	let loaded = false;
 	let error: string | null = null;
@@ -21,7 +17,7 @@
 
 	const banyanLayout: any = getContext('banyanLayout') ?? {};
 	$: banyanLayout.setHeader?.({
-		itemName: `${$i18n.t('Tree')} · ${$page.params.chatId}`
+		itemName: `会话树 · ${$page.params.chatId}`
 	});
 
 	const mockSnapshot: BanyanTreeSnapshot = {
@@ -45,7 +41,7 @@
 		}
 		snapshot = await getBanyanTree($page.params.chatId).catch((e) => {
 			error = `${e}`;
-			toast.error(`${$i18n.t('Failed to load tree')}: ${e}`);
+			toast.error(`会话树加载失败: ${e}`);
 			return null;
 		});
 		loaded = true;
@@ -83,19 +79,27 @@
 		}
 	};
 
+	// 节点状态中文标签(引擎原值兜底展示)
+	const STATUS_LABEL: Record<string, string> = {
+		done: '完成',
+		running: '执行中',
+		failed: '失败',
+		abandoned: '已放弃'
+	};
+
 	onMount(load);
 </script>
 
-<svelte:head><title>{$i18n.t('Tree')} · banyan</title></svelte:head>
+<svelte:head><title>会话树 · banyan</title></svelte:head>
 
 <div class="px-8 lg:px-28 xl:px-40 pb-16 pt-3">
-	{#if error}
-		<div class="mb-3 rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-xs text-red-600 dark:text-red-400">
-			{$i18n.t('Engine unreachable via /banyan/api — start the engine or append ?mock=1 to preview with built-in sample data.')}
-			<br />
-			{error}
-		</div>
-	{/if}
+		{#if error}
+			<div class="mb-3 rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-xs text-red-600 dark:text-red-400">
+				经 /banyan/api 无法连通引擎——请先启动引擎，或追加 ?mock=1 用内置样例数据预览。
+				<br />
+				{error}
+			</div>
+		{/if}
 
 	{#if roots.length}
 		<!-- 平铺渲染：按父链深度缩进 -->
@@ -109,11 +113,11 @@
 							<span class="text-xs text-gray-700 dark:text-gray-200 truncate">{node.label}</span>
 							{#if node.active}
 								<span class="text-[10px] px-1.5 py-px rounded-full bg-black text-white dark:bg-white dark:text-black">
-									{$i18n.t('Active')}
+									活跃
 								</span>
 							{/if}
 							{#if node.status}
-								<span class="text-[10px] text-gray-400">{node.status}</span>
+								<span class="text-[10px] text-gray-400">{STATUS_LABEL[node.status] ?? node.status}</span>
 							{/if}
 						</div>
 						{#if node.summary}
@@ -125,7 +129,7 @@
 		</div>
 	{:else}
 		<div class="text-xs text-gray-400 dark:text-gray-500">
-			{loaded ? $i18n.t('No tree nodes for this chat') : $i18n.t('Loading')}…
+			{loaded ? '该会话暂无树节点' : '加载中'}…
 		</div>
 	{/if}
 </div>

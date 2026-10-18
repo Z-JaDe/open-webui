@@ -2,16 +2,12 @@
 	// /tree — 树视图入口页：输入 chat id → /tree/[chatId]（钩点③）。
 	// ?mock=1 时预填样例 chat id。
 	import { getContext, onMount } from 'svelte';
-	import type { Writable } from 'svelte/store';
 	import { goto } from '$app/navigation';
 
-	import type i18nType from '$lib/i18n';
 	import BanyanPageNav from '$lib/components/banyan/BanyanPageNav.svelte';
 
-	const i18n = getContext<Writable<i18nType>>('i18n');
-
 	const banyanLayout: any = getContext('banyanLayout') ?? {};
-	banyanLayout.setHeader?.({ itemName: $i18n.t('Tree') });
+	banyanLayout.setHeader?.({ itemName: '会话树' });
 
 	let chatId = '';
 
@@ -28,14 +24,14 @@
 	});
 </script>
 
-<svelte:head><title>{$i18n.t('Tree')} · banyan</title></svelte:head>
+<svelte:head><title>会话树 · banyan</title></svelte:head>
 
 <BanyanPageNav />
 
 <div class="px-8 lg:px-28 xl:px-40 pb-16 pt-3">
 	<div class="max-w-md space-y-2">
 		<div class="text-sm text-gray-500 dark:text-gray-400">
-			{$i18n.t('Enter a chat id to open its conversation tree')}
+			输入 chat id 打开其会话树
 		</div>
 		<form
 			class="flex items-center gap-2"
@@ -53,7 +49,7 @@
 				type="submit"
 				class="px-3 py-2 text-xs font-medium rounded-lg bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200 transition"
 			>
-				{$i18n.t('Open')}
+				打开
 			</button>
 		</form>
 	</div>

@@ -12,15 +12,11 @@
 -->
 <script lang="ts">
 	import { getContext } from 'svelte';
-	import type { Writable } from 'svelte/store';
-	import type { i18n as i18nType } from 'i18next';
 
 	import ChevronDown from '$lib/components/icons/ChevronDown.svelte';
 
 	import { mockToolEvents } from './mock';
 	import { formatClock, formatDuration, type BanyanToolEvent } from './types';
-
-	const i18n = getContext<Writable<i18nType>>('i18n');
 
 	/** 按 call_id upsert 后的全量工具事件（按首现顺序） */
 	export let events: BanyanToolEvent[] = [];
@@ -67,7 +63,7 @@
 			on:click={() => (expanded = !expanded)}
 		>
 			<div class="text-xs font-medium text-gray-600 dark:text-gray-300">
-				{$i18n.t('Tool Timeline')}
+				工具时间线
 				<span class="text-gray-400 dark:text-gray-500 font-normal">· {merged.length}</span>
 			</div>
 			<ChevronDown className="size-3.5 text-gray-400 transition {expanded ? 'rotate-180' : ''}" strokeWidth="2" />
@@ -76,7 +72,7 @@
 		<div class="mt-1.5 space-y-1">
 			{#if !expanded && hiddenCount > 0}
 				<div class="text-[11px] text-gray-400 dark:text-gray-500">
-					… {$i18n.t('{n} earlier calls hidden', { n: hiddenCount })}
+					… 已折叠 {hiddenCount} 条更早调用
 				</div>
 			{/if}
 			{#each visible as call (call.call_id)}

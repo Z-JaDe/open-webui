@@ -28,7 +28,7 @@
 	let kbError: string | null = null;
 	let query = '';
 
-	banyanLayout.setHeader?.({ itemName: $i18n.t('Registry') });
+	banyanLayout.setHeader?.({ itemName: '登记簿' });
 
 	const mockItems: BanyanRegistryEntry[] = [
 		{
@@ -128,7 +128,7 @@
 			items = reg.value;
 		} else {
 			error = `${reg.reason}`;
-			toast.error(`${$i18n.t('Failed to load registry')}: ${reg.reason}`);
+			toast.error(`登记簿加载失败: ${reg.reason}`);
 		}
 		if (kb.status === 'fulfilled') {
 			kbCards = kb.value.cards;
@@ -144,6 +144,13 @@
 			item.assertion.toLowerCase().includes(query.toLowerCase()) ||
 			(item.scope ?? '').toLowerCase().includes(query.toLowerCase())
 	);
+
+	// 断言状态中文标签(徽标展示;Tooltip 保留引擎原值)
+	const REG_STATUS_LABEL: Record<string, string> = {
+		green: '通过',
+		red: '未通过',
+		quarantined: '隔离观察'
+	};
 
 	const statusClass = (status: BanyanRegistryEntry['status']): string => {
 		switch (status) {
@@ -164,10 +171,10 @@
 
 	// 知识卡状态:active=生效 / corrected=已修正 / superseded=已替代 / dead=退役
 	const KB_STATUS_LABEL: Record<string, string> = {
-		active: 'Active',
-		corrected: 'Corrected',
-		superseded: 'Superseded',
-		dead: 'Retired'
+		active: '生效',
+		corrected: '已修正',
+		superseded: '已替代',
+		dead: '退役'
 	};
 	const kbStatusClass = (status: string): string => {
 		switch (status) {
@@ -186,25 +193,25 @@
 	onMount(load);
 </script>
 
-<svelte:head><title>{$i18n.t('Registry')} · banyan</title></svelte:head>
+<svelte:head><title>登记簿 · banyan</title></svelte:head>
 
 <BanyanPageNav />
 
 <div class="px-8 lg:px-28 xl:px-40 pb-16 pt-3">
 	<div class="flex items-center justify-between gap-2 flex-wrap mb-3">
 		<div class="text-sm text-gray-500 dark:text-gray-400">
-			{$i18n.t('Assertion registry: no assertion, no ledger entry')}
+			断言登记簿：无断言，不入账
 		</div>
 		<input
 			class="w-64 text-xs rounded-lg px-3 py-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-850 outline-none"
-			placeholder={$i18n.t('Search assertions')}
+			placeholder="搜索断言"
 			bind:value={query}
 		/>
 	</div>
 
 	{#if error}
 		<div class="mb-3 rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-xs text-red-600 dark:text-red-400">
-			{$i18n.t('Engine unreachable via /banyan/api — start the engine or append ?mock=1 to preview with built-in sample data.')}
+			经 /banyan/api 无法连通引擎——请先启动引擎，或追加 ?mock=1 用内置样例数据预览。
 			<br />
 			{error}
 		</div>
@@ -214,12 +221,12 @@
 		<table class="w-full text-xs min-w-[720px]">
 			<thead class="bg-gray-50 dark:bg-gray-900/60 text-gray-500 dark:text-gray-400">
 				<tr>
-					<th class="text-left font-medium px-3 py-2">{$i18n.t('Status')}</th>
-					<th class="text-left font-medium px-3 py-2">{$i18n.t('Assertion')}</th>
-					<th class="text-left font-medium px-3 py-2">{$i18n.t('Scope')}</th>
-					<th class="text-left font-medium px-3 py-2">{$i18n.t('Last Result')}</th>
-					<th class="text-left font-medium px-3 py-2">{$i18n.t('Hits')}</th>
-					<th class="text-left font-medium px-3 py-2">{$i18n.t('Last Checked')}</th>
+					<th class="text-left font-medium px-3 py-2">状态</th>
+					<th class="text-left font-medium px-3 py-2">断言</th>
+					<th class="text-left font-medium px-3 py-2">范围</th>
+					<th class="text-left font-medium px-3 py-2">最近结果</th>
+					<th class="text-left font-medium px-3 py-2">命中</th>
+					<th class="text-left font-medium px-3 py-2">最近检查</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -228,7 +235,7 @@
 						<td class="px-3 py-2">
 							<Tooltip content={item.status}>
 								<span class="px-2 py-0.5 rounded-full border uppercase {statusClass(item.status)}">
-									{item.status}
+									{REG_STATUS_LABEL[item.status] ?? item.status}
 								</span>
 							</Tooltip>
 						</td>
@@ -244,11 +251,11 @@
 						</td>
 					</tr>
 				{:else}
-					<tr>
-						<td colspan="6" class="px-3 py-8 text-center text-gray-400 dark:text-gray-500">
-							{loaded ? $i18n.t('No assertions registered') : $i18n.t('Loading')}…
-						</td>
-					</tr>
+						<tr>
+							<td colspan="6" class="px-3 py-8 text-center text-gray-400 dark:text-gray-500">
+								{loaded ? '暂无登记断言' : '加载中'}…
+							</td>
+						</tr>
 				{/each}
 			</tbody>
 		</table>
@@ -257,12 +264,12 @@
 	<!-- 知识卡区块(RFF P1/F6 补页):引擎 GET /api/knowledge/cards → 卡名/权重/状态 -->
 	<section class="mt-8">
 		<h2 class="text-sm font-medium text-black dark:text-white mb-2">
-			{$i18n.t('Knowledge cards')}
+			知识卡
 			<span class="text-gray-400">({kbFiltered.length})</span>
 		</h2>
 		{#if kbError}
 			<div class="mb-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-amber-600 dark:text-amber-400">
-				{$i18n.t('Knowledge cards unavailable')}
+				知识卡不可用
 				<br />
 				{kbError}
 			</div>
@@ -271,12 +278,12 @@
 			<table class="w-full text-xs min-w-[640px]">
 				<thead class="bg-gray-50 dark:bg-gray-900/60 text-gray-500 dark:text-gray-400">
 					<tr>
-						<th class="text-left font-medium px-3 py-2">{$i18n.t('Card')}</th>
-						<th class="text-left font-medium px-3 py-2">{$i18n.t('Weight')}</th>
-						<th class="text-left font-medium px-3 py-2">{$i18n.t('Status')}</th>
-						<th class="text-left font-medium px-3 py-2">{$i18n.t('Scope')}</th>
-						<th class="text-left font-medium px-3 py-2">{$i18n.t('Used / Wrong')}</th>
-						<th class="text-left font-medium px-3 py-2">{$i18n.t('Updated')}</th>
+						<th class="text-left font-medium px-3 py-2">卡片</th>
+						<th class="text-left font-medium px-3 py-2">权重</th>
+						<th class="text-left font-medium px-3 py-2">状态</th>
+						<th class="text-left font-medium px-3 py-2">范围</th>
+						<th class="text-left font-medium px-3 py-2">使用 / 纠错</th>
+						<th class="text-left font-medium px-3 py-2">更新时间</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -307,7 +314,7 @@
 					{:else}
 						<tr>
 							<td colspan="6" class="px-3 py-8 text-center text-gray-400 dark:text-gray-500">
-								{kbError ? $i18n.t('Knowledge cards unavailable') : loaded ? $i18n.t('No knowledge cards yet') : $i18n.t('Loading')}…
+								{kbError ? '知识卡不可用' : loaded ? '暂无知识卡' : '加载中'}…
 							</td>
 						</tr>
 					{/each}
