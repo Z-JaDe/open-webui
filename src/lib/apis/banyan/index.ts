@@ -412,8 +412,10 @@ export const getBanyanPlans = async (
 ////////////////////////////
 export type BanyanPlanAssertion = {
 	id: string;
-	/** 断言指纹："red-" 前缀=开工红测（spec 为红测命令），其余=交付验收（分组轴） */
+	/** 断言指纹：sha256 十六进制（无前缀）——分组轴不在指纹上 */
 	fingerprint: string;
+	/** 断言类型：红测行带 "red-" 前缀（"red-shell"），验收行为 "shell"（分组轴） */
+	kind: string;
 	/** 断言/红测命令原文 */
 	spec: string;
 	status: BanyanRegistryEntry['status'];
@@ -424,6 +426,14 @@ export type BanyanPlanAssertion = {
 	last_checked_at?: number;
 	task_id?: string;
 };
+
+/** 红绿分组轴（RV-D P1-1 修正后的冻结契约）：引擎登记簿的 fingerprint 是
+ * sha256 十六进制哈希（不含 "red-" 前缀），"red-" 前缀长在 kind 上
+ * （RED_PREFIX + "shell" = "red-shell"）。按 kind 判红测，指纹轴会整组漏判。
+ * （fingerprint 入参仅为测试/展示便利，不参与判定。） */
+export const isRedAssertion = (
+	a: Pick<BanyanPlanAssertion, 'kind' | 'fingerprint'>
+): boolean => a.kind.startsWith('red-');
 
 /** last_result + 阶段 detail → 通过/未通过/未知（RF-20：红测阶段 detail 自带色词） */
 const toVerdict = (raw: any): BanyanPlanAssertion['verdict'] => {
@@ -450,12 +460,14 @@ export const getBanyanPlanRegistry = async (
 	// 引擎 GET /api/registry?plan_id=X 返回该方案的 orch_regs 行数组:
 	// {id, plan_id, task_id, fingerprint, kind, spec, last_result, last_detail,
 	//  last_checked_at, accepted, created_at}
-	// RF-20 冻结契约:红测断言 fingerprint 带 "red-" 前缀,spec 为红测命令,
-	// last_result/last_detail 带 "pre-work red"/"final green" 阶段 detail。
+	// RV-D P1-1 修正冻结契约:指纹=sha256 十六进制(无前缀);"red-" 前缀长在
+	// kind 上("red-shell"),spec 为红测命令,last_result/last_detail 带
+	// "pre-work red"/"final green" 阶段 detail。红绿分组轴=kind。
 	const rows = asArray(await res.json());
 	return rows.map((r: any): BanyanPlanAssertion => ({
 		id: String(r?.id ?? ''),
 		fingerprint: String(r?.fingerprint ?? ''),
+		kind: String(r?.kind ?? ''),
 		spec: String(r?.spec ?? r?.fingerprint ?? r?.id ?? ''),
 		status: toRegistryStatus(r),
 		last_result: r?.last_detail || r?.last_result || undefined,

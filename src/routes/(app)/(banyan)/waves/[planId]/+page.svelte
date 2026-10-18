@@ -2,7 +2,7 @@
 	// /waves/[planId] — WaveBoard 全屏 + 任务检查器（钩点③，统一设计 §6.1 / §8 G3）
 	// 数据源：GET /banyan/api/plans/:planId（代理桥 → 引擎）。
 	// RF-20b：任务检查器内新增断言登记簿区块（GET /registry?plan_id=X，红测断言
-	// fingerprint 带 "red-" 前缀 → 🔴开工红测/🟢交付验收 两组并排）；引擎方案行
+	// kind 带 "red-" 前缀（"red-shell"）→ 🔴开工红测/🟢交付验收 两组并排）；引擎方案行
 	// status=blocked（完成门/攻击门拦截）时页顶黄色提示条，跳信箱/审计。
 	// story 开关：?mock=1 → 内置样例数据（不请求引擎）；?mock=1&blocked=1 预览拦截条。
 	import { onMount, getContext } from 'svelte';
@@ -14,6 +14,7 @@
 	import {
 		getBanyanPlan,
 		getBanyanPlanRegistry,
+		isRedAssertion,
 		type BanyanPlanAssertion,
 		type BanyanPlanSnapshot
 	} from '$lib/apis/banyan';
@@ -36,8 +37,8 @@
 	let assertions: BanyanPlanAssertion[] = [];
 	let assertionsError: string | null = null;
 
-	// 红绿分组轴（冻结契约）：fingerprint "red-" 前缀=开工红测，其余=交付验收
-	const isRedAssertion = (a: BanyanPlanAssertion) => a.fingerprint.startsWith('red-');
+	// 红绿分组轴（RV-D P1-1 修正后的冻结契约）：kind "red-" 前缀（"red-shell"）=开工红测，
+	// 其余=交付验收；fingerprint 是 sha256 十六进制哈希（不含前缀），不作分组轴
 	$: redAssertions = assertions.filter(isRedAssertion);
 	$: greenAssertions = assertions.filter((a) => !isRedAssertion(a));
 	// 完成门/攻击门拦截：PLAN_STATUS_MAP 把 blocked 折进 approved，原始态另看 engine_status
@@ -132,12 +133,15 @@
 		]
 	};
 
-	// RF-20b mock：断言登记簿样例（与冻结契约同形——红测行 fingerprint 带 "red-" 前缀、
-	// spec 为红测命令、last_result 带 "pre-work red"/"final green" 阶段 detail）
+	// RF-20b mock：断言登记簿样例（RV-D P1-1/P3-6 修正后与引擎同形——指纹=sha256
+	// 十六进制无前缀；红测行 kind="red-shell"、验收行 kind="shell"；status 取合法
+	// 枚举 green/red/quarantined/unknown；last_result 带 "pre-work red"/"final
+	// green" 阶段 detail）
 	const mockAssertions: BanyanPlanAssertion[] = [
 		{
 			id: 'reg-mock-r1',
-			fingerprint: 'red-9f31c2b7a4d5e6f7',
+			fingerprint: '9f31c2b7a4d5e6f7',
+			kind: 'red-shell',
 			spec: 'pytest tests/test_scheduler.py -k wave_fanout',
 			status: 'red',
 			last_result: 'pre-work red',
@@ -147,7 +151,8 @@
 		},
 		{
 			id: 'reg-mock-r2',
-			fingerprint: 'red-3a7d1c9e5b2f4806',
+			fingerprint: '3a7d1c9e5b2f4806',
+			kind: 'red-shell',
 			spec: 'npm run test -- --grep 波次并发',
 			status: 'green',
 			last_result: 'final green',
@@ -158,6 +163,7 @@
 		{
 			id: 'reg-mock-g1',
 			fingerprint: '5c2e8a1d7f3b9046',
+			kind: 'shell',
 			spec: 'pytest tests/ -q（存量回归 167 例）',
 			status: 'green',
 			last_result: 'pass',
@@ -168,6 +174,7 @@
 		{
 			id: 'reg-mock-g2',
 			fingerprint: '8d4f0b2e6a9c1357',
+			kind: 'shell',
 			spec: '波次并发度 ≥ 3（bench/wave.py）',
 			status: 'unknown',
 			verdict: 'unknown',
@@ -230,14 +237,14 @@
 	{/if}
 
 	<!-- RF-20b：完成门/攻击门拦截提示条（引擎 plan.status=blocked；不解析 reasons，
-		机械卡在信箱、细节在 K1——给跳转即可） -->
+		机械卡在信箱、细节在 K1——给跳转即可。RV-D P2-3：文案中性化，不再猜具体门） -->
 	{#if gateBlocked}
 		<div
 			class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-700 dark:text-amber-300 space-y-1.5"
 			role="alert"
 		>
-			<div class="font-semibold text-amber-800 dark:text-amber-200">方案被拦截</div>
-			<div>完成门拦截——查信箱卡与 K1（原因：交付物缺失/回归红等）</div>
+			<div class="font-semibold text-amber-800 dark:text-amber-200">方案被拦截（完成门/攻击门）</div>
+			<div>查信箱卡与 K1 定位原因</div>
 			<div class="flex items-center gap-2 pt-0.5">
 				<a
 					href="/inbox"
@@ -297,7 +304,7 @@
 					</div>
 				{/if}
 
-				<!-- RF-20b：断言登记簿区块（红绿两组并排：fingerprint "red-" 前缀=开工红测） -->
+				<!-- RF-20b：断言登记簿区块（红绿两组并排：kind "red-" 前缀（"red-shell"）=开工红测，RV-D P1-1） -->
 				<div class="pt-2 mt-1 border-t border-gray-100 dark:border-gray-850 space-y-2">
 					<div class="flex items-center justify-between">
 						<div class="text-sm font-medium text-black dark:text-white">断言登记簿</div>
@@ -334,8 +341,11 @@
 											>
 												{a.spec}
 											</div>
-											<div class="text-[11px] {VERDICT_CLASS[a.verdict]}">
-												{$i18n.t(VERDICT_LABEL[a.verdict])}{a.last_result ? ` · ${a.last_result}` : ''}
+											<div class="flex items-center gap-1.5 text-[11px]">
+												<span class="text-gray-400 font-mono">{a.kind || 'unknown'}</span>
+												<span class={VERDICT_CLASS[a.verdict]}>
+													{$i18n.t(VERDICT_LABEL[a.verdict])}{a.last_result ? ` · ${a.last_result}` : ''}
+												</span>
 											</div>
 										</div>
 									{/each}
