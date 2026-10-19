@@ -3,12 +3,14 @@
 	// D4/F5 升格为"系统状态的家":状态卡(BanyanEngineStatus 组件复用,登录即可见,
 	// 无 admin 依赖 D11)+ 三进程一句话说明 + 存储单根路径(D26,数据源 /status 的
 	// engine.home 字段)。正本架构文档在 banyan 主仓 docs/architecture.md,下方镜像渲染。
+	// RF-37:花名册卡片旁增「场景包」卡片(数据源 /api/packs,经 getBanyanPacks)。
 	import { getContext, onMount } from 'svelte';
 	import type i18nType from '$lib/i18n';
 
 	import Markdown from '$lib/components/chat/Messages/Markdown.svelte';
 	import BanyanEngineStatus from '$lib/components/admin/BanyanEngineStatus.svelte';
 	import PiSessions from '$lib/components/banyan/PiSessions.svelte';
+	import PackListCard from '$lib/components/banyan/PackListCard.svelte';
 	import { getBanyanStatus, type BanyanEngineStatus as BanyanEngineStatusData } from '$lib/apis/banyan';
 
 	// @ts-ignore md raw import has no local typings in this repo
@@ -139,6 +141,10 @@
 			</div>
 
 			{#if loaded}
+				<!-- RF-37:运行面卡片行(场景包;花名册卡片落同排) -->
+				<div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+					<PackListCard />
+				</div>
 				<div class="prose dark:prose-invert max-w-full text-sm">
 					<Markdown content={architectureMd} id="banyan-architecture" />
 				</div>

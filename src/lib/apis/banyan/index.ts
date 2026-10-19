@@ -524,6 +524,48 @@ export const switchBanyanTreeNode = async (
 // 缺位,待引擎补树写端点后统一恢复)。
 
 ////////////////////////////
+// 场景包 /packs（RF-37：可插拔场景配置集——研发代码/国际局势分析等各一套
+// Agent/提示词/技能；核心 5 Agent 常驻场景无关，包内特化 Agent 只能被
+// spawn_agent 按需拉起）
+////////////////////////////
+export type BanyanPack = {
+	/** 场景包名（=目录名，如「研发」） */
+	id: string;
+	/** 一句话描述（pack.json description） */
+	description?: string;
+	/** 场景特化 Agent 名单（只能被 spawn_agent 带 pack 拉起，零常驻成本） */
+	agents: string[];
+	/** 场景任务模板名 */
+	prompts: string[];
+	/** 场景技能名 */
+	skills: string[];
+	/** 在盘内容统计 */
+	counts?: { prompts: number; skills: number; agents: number };
+};
+
+export const getBanyanPacks = async (
+	token: string = localStorage.token
+): Promise<BanyanPack[]> => {
+	const res = await fetch(`${BANYAN_API_BASE_URL}/packs`, {
+		method: 'GET',
+		headers: { Authorization: `Bearer ${token}` }
+	});
+	if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+	// 引擎 GET /api/packs 返回
+	// {packs:[{name,description,agents,prompts,skills,counts}]}（坏包已跳过）
+	// → BanyanPack
+	const raw: any = await res.json();
+	return asArray(raw?.packs).map((p: any): BanyanPack => ({
+		id: String(p?.name ?? ''),
+		description: p?.description ? String(p.description) : undefined,
+		agents: asArray(p?.agents).map(String),
+		prompts: asArray(p?.prompts).map(String),
+		skills: asArray(p?.skills).map(String),
+		counts: p?.counts ?? undefined
+	}));
+};
+
+////////////////////////////
 // 子代理停止（引擎对端：POST /api/work/{work_id}/cancel）
 ////////////////////////////
 export const stopBanyanSubagent = async (
