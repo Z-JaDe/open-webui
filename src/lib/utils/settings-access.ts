@@ -28,7 +28,7 @@ export function canSearchSetting(
 ): boolean {
 	const stem = key.replace(/\.(label|description|title)$/, '');
 	if (stem === 'settings.personal.general.sections.systemPrompt')
-		return canEditSystemPrompt(context);
+		return false; // RF-34:system prompt 整块退役(人格正本=引擎 Agent md),搜索同步下线
 	if (
 		stem === 'settings.personal.general.sections.advancedParameters' ||
 		stem === 'settings.personal.general.modelParameters' ||

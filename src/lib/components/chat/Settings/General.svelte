@@ -12,7 +12,6 @@
 	const i18n: any = getContext('i18n');
 
 	import AdvancedParams from './Advanced/AdvancedParams.svelte';
-	import Textarea from '$lib/components/common/Textarea.svelte';
 	import UserSettingField from './UserSettingField.svelte';
 	import UserSettingRow from './UserSettingRow.svelte';
 	import UserSettingSection from './UserSettingSection.svelte';
@@ -30,8 +29,6 @@
 
 	let showAdvanced = false;
 
-	const systemPromptTextareaClass =
-		'w-full resize-y rounded-lg border border-gray-100/50 bg-gray-50/40 px-2 py-1.5 text-xs text-gray-700 outline-hidden transition-colors placeholder:text-gray-300 focus:border-blue-400 dark:border-white/[0.04] dark:bg-white/[0.03] dark:text-gray-300 dark:placeholder:text-gray-700 dark:focus:border-blue-500';
 	const actionButtonClass =
 		'text-xs text-gray-500 transition-colors hover:text-gray-900 dark:text-gray-500 dark:hover:text-white';
 
@@ -280,20 +277,10 @@
 			{/if}
 		</UserSettingSection>
 
-		{#if canEditSystemPrompt}
-			<UserSettingSection title={$i18n.t('settings.personal.general.sections.systemPrompt.title')}>
-				<UserSettingField
-					description={$i18n.t('settings.personal.general.sections.systemPrompt.description')}
-				>
-					<Textarea
-						bind:value={system}
-						className={systemPromptTextareaClass}
-						rows="4"
-						placeholder={$i18n.t('Enter system prompt here')}
-					/>
-				</UserSettingField>
-			</UserSettingSection>
-		{/if}
+		<!-- RF-34:system prompt 整块退役——banyan 架构下人格正本=引擎 Agent md
+				($BANYAN_HOME/agents/*.md),该字段是全局设置无法按模型区分,对 banyan
+				档位模型是人格冲突源;个人区不再渲染(存量值保留:saveHandler/onMount
+				原样带回不清空),设置搜索同步下线(settings-access.canSearchSetting)。 -->
 
 		{#if canEditParams}
 			<UserSettingSection

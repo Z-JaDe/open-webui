@@ -736,6 +736,15 @@ export type BanyanEngineStatus = {
 	};
 	sidecar: { ok: boolean; roles?: string[] | Record<string, any> };
 	tiers: { id: string; label?: string; desc?: string; model?: string; keyed?: boolean; default?: boolean }[];
+	// RF-34:Agent 花名册(引擎统一目录正本轻量直读;output=output_kind 形态关键字)
+	agents: {
+		name: string;
+		description?: string;
+		tier?: string;
+		tools?: string[];
+		memory?: string;
+		output?: string;
+	}[];
 	counts: { inbox: BanyanInboxUnread; plans_running: number };
 };
 
@@ -768,6 +777,14 @@ export const getBanyanStatus = async (token: string = localStorage.token): Promi
 			model: t?.model ? String(t.model) : undefined,
 			keyed: !!t?.keyed,
 			default: !!t?.default
+		})),
+		agents: asArray(raw?.agents).map((a: any) => ({
+			name: String(a?.name ?? ''),
+			description: a?.description ? String(a.description) : undefined,
+			tier: a?.tier ? String(a.tier) : undefined,
+			tools: asArray(a?.tools).map((t: any) => String(t)),
+			memory: a?.memory ? String(a.memory) : undefined,
+			output: a?.output ? String(a.output) : undefined
 		})),
 		counts: {
 			inbox: {

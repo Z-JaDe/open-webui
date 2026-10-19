@@ -9,7 +9,7 @@
 	import Markdown from '$lib/components/chat/Messages/Markdown.svelte';
 	import BanyanEngineStatus from '$lib/components/admin/BanyanEngineStatus.svelte';
 	import PiSessions from '$lib/components/banyan/PiSessions.svelte';
-	import { getBanyanStatus } from '$lib/apis/banyan';
+	import { getBanyanStatus, type BanyanEngineStatus as BanyanEngineStatusData } from '$lib/apis/banyan';
 
 	// @ts-ignore md raw import has no local typings in this repo
 	import architectureMd from '$lib/assets/architecture.md?raw';
@@ -18,15 +18,24 @@
 
 	let loaded = false;
 	let home = '';
+	let agents: BanyanEngineStatusData['agents'] = [];
 	onMount(async () => {
 		// 存储单根(D26):BANYAN_HOME 收纳一切(引擎库/工作区/日志/技能投影);取不到静默
 		try {
-			home = (await getBanyanStatus()).engine.home ?? '';
+			const status = await getBanyanStatus();
+			home = status.engine.home ?? '';
+			// RF-34:Agent 花名册(引擎统一目录正本;与状态卡同一次拉取)
+			agents = status.agents ?? [];
 		} catch {
 			home = '';
 		}
 		loaded = true;
 	});
+
+	// 花名册枚举值 → 中文展示(档位/工具清单保留原文,那是配置正本的 id)
+	const memoryLabel = (m?: string) => (m === 'persistent' ? '持久(会话)' : m === 'fresh' ? '单轮' : m ?? '-');
+	const outputLabel = (o?: string) =>
+		o === 'json' ? 'JSON 契约' : o === 'markdown' ? 'Markdown' : o === 'text' ? '自由文本' : o ?? '-';
 </script>
 
 <svelte:head>
@@ -72,6 +81,60 @@
 						引擎状态
 					</div>
 					<BanyanEngineStatus />
+				</div>
+
+				<!-- RF-34:Agent 花名册(数据源 getBanyanStatus().agents;引擎统一目录正本) -->
+				<div
+					class="rounded-xl border border-gray-100 dark:border-gray-850 p-4 text-xs"
+					data-testid="banyan-arch-agents"
+				>
+					<div class="text-sm font-medium text-black dark:text-white mb-3">
+						Agent 花名册
+					</div>
+					{#if loaded && agents.length}
+						<div class="overflow-x-auto">
+							<table class="w-full text-left">
+								<thead>
+									<tr class="text-gray-400 dark:text-gray-500">
+										<th class="py-1 pr-3 font-medium">名字</th>
+										<th class="py-1 pr-3 font-medium">职责</th>
+										<th class="py-1 pr-3 font-medium">档位</th>
+										<th class="py-1 pr-3 font-medium">工具</th>
+										<th class="py-1 pr-3 font-medium">记忆</th>
+										<th class="py-1 font-medium">输出</th>
+									</tr>
+								</thead>
+								<tbody>
+									{#each agents as agent (agent.name)}
+										<tr class="border-t border-gray-100 dark:border-gray-850 align-top">
+											<td class="py-1.5 pr-3 text-black dark:text-white whitespace-nowrap">
+												{agent.name}
+											</td>
+											<td class="py-1.5 pr-3 text-gray-500 dark:text-gray-400 max-w-[16rem]">
+												{agent.description || '-'}
+											</td>
+											<td class="py-1.5 pr-3 font-mono text-gray-700 dark:text-gray-300">
+												{agent.tier ?? '-'}
+											</td>
+											<td class="py-1.5 pr-3 text-gray-500 dark:text-gray-400">
+												{agent.tools?.length ? agent.tools.join(', ') : '-'}
+											</td>
+											<td class="py-1.5 pr-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">
+												{memoryLabel(agent.memory)}
+											</td>
+											<td class="py-1.5 text-gray-500 dark:text-gray-400 whitespace-nowrap">
+												{outputLabel(agent.output)}
+											</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
+					{:else}
+						<div class="text-gray-400 dark:text-gray-500">
+							{loaded ? '花名册不可得(引擎未返回)' : '加载中…'}
+						</div>
+					{/if}
 				</div>
 			</div>
 

@@ -14,6 +14,7 @@
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
 	import Knobs from '$lib/components/icons/Knobs.svelte';
 	import { localizeModelControls, resolveLocalizedModelName } from '$lib/utils/localizedContent';
+	import { isBanyanTierModel } from '$lib/utils/banyan-model';
 
 	const i18n: any = getContext('i18n');
 	export let selectedModels: string[] = [];
@@ -31,6 +32,8 @@
 		await tick();
 		if (trigger) document.getElementById(trigger.id)?.focus();
 	};
+	// RF-34:banyan 档位模型(meta.kind=tier)不进 Controls——模型参数归引擎档位,
+	// 面板对它是死旋钮;全选档位模型时按钮整体隐藏,混选时非 banyan 照旧。
 	$: available = selectedModels
 		.map((id) => $models.find((model) => model.id === id))
 		.filter(
@@ -38,6 +41,7 @@
 				!!model &&
 				!('direct' in model && model.direct) &&
 				!('pipe' in model && model.pipe) &&
+				!isBanyanTierModel(model) &&
 				Object.keys(model.info?.params?.model_controls ?? {}).length > 0
 		);
 	$: permitted =
