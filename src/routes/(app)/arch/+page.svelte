@@ -1,32 +1,24 @@
 <script lang="ts">
-	// banyan /arch:架构页(WE-7,统一设计 §8 G3 追加路由)。
-	// D4/F5 升格为"系统状态的家":状态卡(BanyanEngineStatus 组件复用,登录即可见,
-	// 无 admin 依赖 D11)+ 三进程一句话说明 + 存储单根路径(D26,数据源 /status 的
-	// engine.home 字段)。正本架构文档在 banyan 主仓 docs/architecture.md,下方镜像渲染。
-	// RF-37:花名册卡片旁增「场景包」卡片(数据源 /api/packs,经 getBanyanPacks)。
+	// banyan /arch:架构页——全系统唯一的架构参考(代码/存储/交互/模型全景)。
+	// 一切内容内嵌,不依赖外部 md;数据源 /api/status + /api/packs(登录即可见)。
 	import { getContext, onMount } from 'svelte';
 	import type i18nType from '$lib/i18n';
 
-	import Markdown from '$lib/components/chat/Messages/Markdown.svelte';
 	import BanyanEngineStatus from '$lib/components/admin/BanyanEngineStatus.svelte';
 	import PiSessions from '$lib/components/banyan/PiSessions.svelte';
 	import PackListCard from '$lib/components/banyan/PackListCard.svelte';
 	import { getBanyanStatus, type BanyanEngineStatus as BanyanEngineStatusData } from '$lib/apis/banyan';
-
-	// @ts-ignore md raw import has no local typings in this repo
-	import architectureMd from '$lib/assets/architecture.md?raw';
 
 	const i18n: typeof i18nType = getContext('i18n');
 
 	let loaded = false;
 	let home = '';
 	let agents: BanyanEngineStatusData['agents'] = [];
+
 	onMount(async () => {
-		// 存储单根(D26):BANYAN_HOME 收纳一切(引擎库/工作区/日志/技能投影);取不到静默
 		try {
 			const status = await getBanyanStatus();
 			home = status.engine.home ?? '';
-			// RF-34:Agent 花名册(引擎统一目录正本;与状态卡同一次拉取)
 			agents = status.agents ?? [];
 		} catch {
 			home = '';
@@ -34,8 +26,8 @@
 		loaded = true;
 	});
 
-	// 花名册枚举值 → 中文展示(档位/工具清单保留原文,那是配置正本的 id)
-	const memoryLabel = (m?: string) => (m === 'persistent' ? '持久(会话)' : m === 'fresh' ? '单轮' : m ?? '-');
+	const memoryLabel = (m?: string) =>
+		m === 'persistent' ? '持久(按会话/按方案)' : m === 'fresh' ? '单轮(用完即弃)' : m ?? '-';
 	const outputLabel = (o?: string) =>
 		o === 'json' ? 'JSON 契约' : o === 'markdown' ? 'Markdown' : o === 'text' ? '自由文本' : o ?? '-';
 </script>
@@ -58,20 +50,23 @@
 				</h1>
 			</div>
 
-			<!-- D4:系统状态的家——三进程一句话 + 存储单根 + 引擎状态卡 -->
+			<!-- ═══ 系统总览 ═══ -->
 			<div class="mb-6 space-y-4">
 				<div
 					class="rounded-xl border border-gray-100 dark:border-gray-850 p-4 space-y-2 text-sm"
 				>
-					<div class="font-medium text-black dark:text-white">系统</div>
+					<div class="font-medium text-black dark:text-white">系统总览</div>
 					<p class="text-gray-500 dark:text-gray-400">
-						三个进程：引擎（:8000，编排、存储正本、K1 事件流）· sidecar（:8100，技能投影）· WebUI（:8080，身份与呈现）。
+						三个进程:引擎(:8000,编排调度·状态正本·K1 事件流)· sidecar(:8100,pi 执行内核·沙箱工具)· WebUI(:8080,身份认证·界面呈现)。
 					</p>
 					<p class="text-gray-500 dark:text-gray-400">
-						存储根（BANYAN_HOME）：
+						存储根(BANYAN_HOME):
 						<span class="break-all font-mono text-xs text-gray-700 dark:text-gray-300">
 							{home || '引擎不可达'}
 						</span>
+					</p>
+					<p class="text-gray-400 dark:text-gray-500 text-xs">
+						人只出现在两个触点:批准方案、处置信箱。其余全自动。
 					</p>
 				</div>
 
@@ -84,79 +79,235 @@
 					</div>
 					<BanyanEngineStatus />
 				</div>
+			</div>
 
-				<!-- RF-34:Agent 花名册(数据源 getBanyanStatus().agents;引擎统一目录正本) -->
-				<div
-					class="rounded-xl border border-gray-100 dark:border-gray-850 p-4 text-xs"
-					data-testid="banyan-arch-agents"
-				>
-					<div class="text-sm font-medium text-black dark:text-white mb-3">
-						Agent 花名册
-					</div>
-					{#if loaded && agents.length}
-						<div class="overflow-x-auto">
-							<table class="w-full text-left">
-								<thead>
-									<tr class="text-gray-400 dark:text-gray-500">
-										<th class="py-1 pr-3 font-medium">名字</th>
-										<th class="py-1 pr-3 font-medium">职责</th>
-										<th class="py-1 pr-3 font-medium">档位</th>
-										<th class="py-1 pr-3 font-medium">工具</th>
-										<th class="py-1 pr-3 font-medium">记忆</th>
-										<th class="py-1 font-medium">输出</th>
+			<!-- ═══ Agent 全景 ═══ -->
+			<div
+				class="rounded-xl border border-gray-100 dark:border-gray-850 p-4 text-xs mb-6"
+				data-testid="banyan-arch-agents"
+			>
+				<div class="text-sm font-medium text-black dark:text-white mb-1">
+					Agent 全景(5 个)
+				</div>
+				<p class="text-gray-400 dark:text-gray-500 text-xs mb-3">
+					每个 Agent 一份 md(frontmatter:名称/描述/档位/工具/记忆/输出),提示词正本在
+					<code class="text-[10px]">{home}/agents/</code>。全部跑在 pi 内核 ReAct 上。
+				</p>
+				{#if loaded && agents.length}
+					<div class="overflow-x-auto">
+						<table class="w-full text-left">
+							<thead>
+								<tr class="text-gray-400 dark:text-gray-500">
+									<th class="py-1 pr-3 font-medium">名字</th>
+									<th class="py-1 pr-3 font-medium">职责</th>
+									<th class="py-1 pr-3 font-medium">档位→模型</th>
+									<th class="py-1 pr-3 font-medium">工具</th>
+									<th class="py-1 pr-3 font-medium">记忆</th>
+									<th class="py-1 font-medium">输出</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each agents as agent (agent.name)}
+									<tr class="border-t border-gray-100 dark:border-gray-850 align-top">
+										<td class="py-1.5 pr-3 text-black dark:text-white whitespace-nowrap">
+											{agent.name}
+										</td>
+										<td class="py-1.5 pr-3 text-gray-500 dark:text-gray-400 max-w-[16rem]">
+											{agent.description || '-'}
+										</td>
+										<td class="py-1.5 pr-3 font-mono text-gray-700 dark:text-gray-300">
+											{agent.tier ?? '-'}
+										</td>
+										<td class="py-1.5 pr-3 text-gray-500 dark:text-gray-400">
+											{agent.tools?.length ? agent.tools.join(', ') : '-'}
+										</td>
+										<td class="py-1.5 pr-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">
+											{memoryLabel(agent.memory)}
+										</td>
+										<td class="py-1.5 text-gray-500 dark:text-gray-400 whitespace-nowrap">
+											{outputLabel(agent.output)}
+										</td>
 									</tr>
-								</thead>
-								<tbody>
-									{#each agents as agent (agent.name)}
-										<tr class="border-t border-gray-100 dark:border-gray-850 align-top">
-											<td class="py-1.5 pr-3 text-black dark:text-white whitespace-nowrap">
-												{agent.name}
-											</td>
-											<td class="py-1.5 pr-3 text-gray-500 dark:text-gray-400 max-w-[16rem]">
-												{agent.description || '-'}
-											</td>
-											<td class="py-1.5 pr-3 font-mono text-gray-700 dark:text-gray-300">
-												{agent.tier ?? '-'}
-											</td>
-											<td class="py-1.5 pr-3 text-gray-500 dark:text-gray-400">
-												{agent.tools?.length ? agent.tools.join(', ') : '-'}
-											</td>
-											<td class="py-1.5 pr-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">
-												{memoryLabel(agent.memory)}
-											</td>
-											<td class="py-1.5 text-gray-500 dark:text-gray-400 whitespace-nowrap">
-												{outputLabel(agent.output)}
-											</td>
-										</tr>
-									{/each}
-								</tbody>
-							</table>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				{:else}
+					<div class="text-gray-400 dark:text-gray-500">
+						{loaded ? '花名册不可得(引擎未返回)' : '加载中…'}
+					</div>
+				{/if}
+			</div>
+
+			<!-- ═══ 角色交互(五场景 choreography)═══ -->
+			<div
+				class="rounded-xl border border-gray-100 dark:border-gray-850 p-4 text-xs mb-6"
+				data-testid="banyan-arch-interactions"
+			>
+				<div class="text-sm font-medium text-black dark:text-white mb-3">
+					角色交互(Agent 之间永不直接对话,一切经三种黑板:K1 事件流 · 工作区文件 · 信箱/审卡)
+				</div>
+				<div class="space-y-4">
+					<div>
+						<div class="font-medium text-gray-700 dark:text-gray-300 mb-1">对话流(秘书主导)</div>
+						<div class="font-mono text-[11px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 rounded p-2 overflow-x-auto">
+人 ─▶ WebUI ─▶ /run(秘书.md + 九件查询工具) ─▶ pi ReAct
+  ├─ 工具调用 ─▶ HTTP 回调 ─▶ 引擎 store 直读(信箱/任务/台账/日历)
+  ├─ spawn_agent ─▶ /run(探索者/审查者实例) ─▶ 结果回流
+  └─ 回复 ──▶ pi_event 镜像 ─▶ SSE ─▶ WebUI 流式 ──▶ chat.db(K1 先行)
 						</div>
-					{:else}
-						<div class="text-gray-400 dark:text-gray-500">
-							{loaded ? '花名册不可得(引擎未返回)' : '加载中…'}
+					</div>
+					<div>
+						<div class="font-medium text-gray-700 dark:text-gray-300 mb-1">方案流(任务管理器主导)</div>
+						<div class="font-mono text-[11px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 rounded p-2 overflow-x-auto">
+人/秘书 ─▶ 方案卡 ──▶ 级联准入(规则→单席→镜头→人)──▶ Ticket
+  ──▶ 探索(方案卡)──▶ 人批准 ──▶ 攻击门(3×审查者,拦截→信箱→豁免重入)
+  ──▶ 波次执行(执行者)──▶ 登记簿断言 ──▶ 完成门四条件
+  ──▶ finished + 信箱完成卡 + K2 知识结算
+  失败/模糊 ──▶ 任务管理器裁决 ──▶ 信箱卡 ──▶ 人处置 ──▶ 恢复
 						</div>
-					{/if}
+					</div>
+				</div>
+			</div>
+
+			<!-- ═══ pi 框架使用 ═══ -->
+			<div
+				class="rounded-xl border border-gray-100 dark:border-gray-850 p-4 text-xs mb-6"
+				data-testid="banyan-arch-pi"
+			>
+				<div class="text-sm font-medium text-black dark:text-white mb-3">
+					pi 框架(@earendil-works/pi-coding-agent)——banyan 的 Agent 执行内核
+				</div>
+				<div class="overflow-x-auto">
+					<table class="w-full text-left">
+						<thead>
+							<tr class="text-gray-400 dark:text-gray-500">
+								<th class="py-1 pr-3 font-medium">pi 提供</th>
+								<th class="py-1 font-medium">banyan 怎么用</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr class="border-t border-gray-100 dark:border-gray-850">
+								<td class="py-1 pr-3">AgentSession(ReAct 循环)</td>
+								<td>sidecar /run 收到 system_prompt+task_text+model+tools → 创建 AgentSession → 启动 ReAct</td>
+							</tr>
+							<tr class="border-t border-gray-100 dark:border-gray-850">
+								<td class="py-1 pr-3">工具沙箱(read/write/bash/grep)</td>
+								<td>pi 内建工具按白名单注入;工作区=路径监狱(逃逸即拒)</td>
+							</tr>
+							<tr class="border-t border-gray-100 dark:border-gray-850">
+								<td class="py-1 pr-3">会话树(session jsonl)</td>
+								<td>每次 /run = 一个 Pi 会话,文件级留痕;引擎镜像到 K1(pi_event)</td>
+							</tr>
+							<tr class="border-t border-gray-100 dark:border-gray-850">
+								<td class="py-1 pr-3">运行中注入(prompt + streamingBehavior)</td>
+								<td>steer=打断当前转新方向;followUp=本轮结束后接续——秘书/任务管理器的 agent_inject 直接映射</td>
+							</tr>
+							<tr class="border-t border-gray-100 dark:border-gray-850">
+								<td class="py-1 pr-3">事件流(SSE)</td>
+								<td>sidecar /sessions/:id/events SSE → 引擎逐条镜像 K1(pi_event)+ 水位断档检测(pi_mirror_gap)</td>
+							</tr>
+							<tr class="border-t border-gray-100 dark:border-gray-850">
+								<td class="py-1 pr-3">模型路由</td>
+								<td>/run payload.model → pi models.json 解析 → GLM API 调用</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+
+			<!-- ═══ 存储架构 ═══ -->
+			<div
+				class="rounded-xl border border-gray-100 dark:border-gray-850 p-4 text-xs mb-6"
+				data-testid="banyan-arch-storage"
+			>
+				<div class="text-sm font-medium text-black dark:text-white mb-3">
+					存储架构(单一事实正本:K1 事件流;单一存储根:<span class="font-mono">{home}</span>)
+				</div>
+				<div class="overflow-x-auto">
+					<table class="w-full text-left">
+						<thead>
+							<tr class="text-gray-400 dark:text-gray-500">
+								<th class="py-1 pr-3 font-medium">对象</th>
+								<th class="py-1 pr-3 font-medium">唯一正本</th>
+								<th class="py-1 font-medium">生命周期</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr class="border-t border-gray-100 dark:border-gray-850">
+								<td class="py-1 pr-3">K1 事件流</td>
+								<td>events/ jsonl(append+fsync)</td>
+								<td>永久(审计可回放)</td>
+							</tr>
+							<tr class="border-t border-gray-100 dark:border-gray-850">
+								<td class="py-1 pr-3">会话消息</td>
+								<td>chat.db messages(K1 可重建)</td>
+								<td>随会话</td>
+							</tr>
+							<tr class="border-t border-gray-100 dark:border-gray-850">
+								<td class="py-1 pr-3">方案/任务</td>
+								<td>chat.db orch_*</td>
+								<td>终态留史</td>
+							</tr>
+							<tr class="border-t border-gray-100 dark:border-gray-850">
+								<td class="py-1 pr-3">信箱卡</td>
+								<td>chat.db msg_items</td>
+								<td>已处置留史/notice 7 天过期</td>
+							</tr>
+							<tr class="border-t border-gray-100 dark:border-gray-850">
+								<td class="py-1 pr-3">日历</td>
+								<td>chat.db cal_events</td>
+								<td>取消=置态</td>
+							</tr>
+							<tr class="border-t border-gray-100 dark:border-gray-850">
+								<td class="py-1 pr-3">自动化</td>
+								<td>chat.db aut_items</td>
+								<td>删除=物理删</td>
+							</tr>
+							<tr class="border-t border-gray-100 dark:border-gray-850">
+								<td class="py-1 pr-3">断言登记簿</td>
+								<td>chat.db orch_regs(红/绿两轨)</td>
+								<td>随方案</td>
+							</tr>
+							<tr class="border-t border-gray-100 dark:border-gray-850">
+								<td class="py-1 pr-3">附件</td>
+								<td>workspace/.banyan-uploads(K1 file.stored)</td>
+								<td>随工作区</td>
+							</tr>
+							<tr class="border-t border-gray-100 dark:border-gray-850">
+								<td class="py-1 pr-3">知识/技能/角色正本</td>
+								<td>knowledge 仓(git: cards/records/agents/prompts)</td>
+								<td>版本化</td>
+							</tr>
+							<tr class="border-t border-gray-100 dark:border-gray-850">
+								<td class="py-1 pr-3">WebUI 身份/配置</td>
+								<td>webui/webui.db(+cache/uploads)</td>
+								<td>仅身份与界面偏好(零消息)</td>
+							</tr>
+							<tr class="border-t border-gray-100 dark:border-gray-850">
+								<td class="py-1 pr-3">sidecar 运行态</td>
+								<td>pi-sidecar/(Pi 会话树=执行缓存)</td>
+								<td>K1 镜像为正本</td>
+							</tr>
+						</tbody>
+					</table>
 				</div>
 			</div>
 
 			{#if loaded}
-				<!-- RF-37:运行面卡片行(场景包;花名册卡片落同排) -->
+				<!-- RF-37:运行面卡片行(场景包) -->
 				<div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
 					<PackListCard />
 				</div>
-				<div class="prose dark:prose-invert max-w-full text-sm">
-					<Markdown content={architectureMd} id="banyan-architecture" />
-				</div>
 			{/if}
 
-			<!-- F15/D28:sidecar Pi 会话(手工/休眠会话可见性,只读) -->
+			<!-- F15/D28:sidecar Pi 会话(只读) -->
 			<div
 				class="rounded-xl border border-gray-100 dark:border-gray-850 p-4 mt-6 text-xs"
 				data-testid="banyan-pi-sessions"
 			>
 				<div class="text-sm font-medium text-black dark:text-white mb-3">
-					Pi 会话（sidecar，只读）
+					Pi 会话(sidecar,只读)
 				</div>
 				<PiSessions />
 			</div>
