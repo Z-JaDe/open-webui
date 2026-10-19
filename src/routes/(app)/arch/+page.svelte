@@ -170,51 +170,128 @@
 				</div>
 			</div>
 
-			<!-- ═══ pi 框架使用 ═══ -->
+			<!-- ═══ pi 框架架构(完整介绍)═══ -->
 			<div
 				class="rounded-xl border border-gray-100 dark:border-gray-850 p-4 text-xs mb-6"
 				data-testid="banyan-arch-pi"
 			>
-				<div class="text-sm font-medium text-black dark:text-white mb-3">
-					pi 框架(@earendil-works/pi-coding-agent)——banyan 的 Agent 执行内核
+				<div class="text-sm font-medium text-black dark:text-white mb-1">
+					pi 执行内核(@earendil-works/pi-coding-agent v1.2.0)
 				</div>
+				<p class="text-gray-400 dark:text-gray-500 mb-3">
+					banyan 所有 Agent 的推理与工具执行都跑在 pi 内核上。pi 是一个通用的 coding agent 框架,提供 AgentSession(ReAct 循环)、工具沙箱、会话树、运行中注入、模型路由——banyan 把自己的提示词和工具清单交给 pi,pi 负责让 LLM 真正干活。
+				</p>
+
+				<div class="font-medium text-gray-700 dark:text-gray-300 mb-2 mt-3">pi 内核分层</div>
 				<div class="overflow-x-auto">
 					<table class="w-full text-left">
 						<thead>
 							<tr class="text-gray-400 dark:text-gray-500">
-								<th class="py-1 pr-3 font-medium">pi 提供</th>
-								<th class="py-1 font-medium">banyan 怎么用</th>
+								<th class="py-1 pr-3 font-medium">层</th>
+								<th class="py-1 pr-3 font-medium">模块</th>
+								<th class="py-1 font-medium">职责</th>
 							</tr>
 						</thead>
 						<tbody>
 							<tr class="border-t border-gray-100 dark:border-gray-850">
-								<td class="py-1 pr-3">AgentSession(ReAct 循环)</td>
-								<td>sidecar /run 收到 system_prompt+task_text+model+tools → 创建 AgentSession → 启动 ReAct</td>
+								<td class="py-1 pr-3">会话运行时</td>
+								<td class="py-1 pr-3 font-mono text-[10px]">core/agent-session.ts</td>
+								<td class="py-1 text-gray-500 dark:text-gray-400">AgentSession 类:prompt() 启动 ReAct 循环、abort() 中断、compact() 压缩、cycleModel() 切模型、navigateTree() 分支导航——一个会话的完整生命周期</td>
 							</tr>
 							<tr class="border-t border-gray-100 dark:border-gray-850">
-								<td class="py-1 pr-3">工具沙箱(read/write/bash/grep)</td>
-								<td>pi 内建工具按白名单注入;工作区=路径监狱(逃逸即拒)</td>
+								<td class="py-1 pr-3">会话管理</td>
+								<td class="py-1 pr-3 font-mono text-[10px]">core/session-manager.ts</td>
+								<td class="py-1 text-gray-500 dark:text-gray-400">多会话注册表:创建/切换/分叉/归档;jsonl 持久化(banyan sidecar 的 sessions/ 目录)</td>
 							</tr>
 							<tr class="border-t border-gray-100 dark:border-gray-850">
-								<td class="py-1 pr-3">会话树(session jsonl)</td>
-								<td>每次 /run = 一个 Pi 会话,文件级留痕;引擎镜像到 K1(pi_event)</td>
-							</tr>
-							<tr class="border-t border-gray-100 dark:border-gray-850">
-								<td class="py-1 pr-3">运行中注入(prompt + streamingBehavior)</td>
-								<td>steer=打断当前转新方向;followUp=本轮结束后接续——秘书/任务管理器的 agent_inject 直接映射</td>
-							</tr>
-							<tr class="border-t border-gray-100 dark:border-gray-850">
-								<td class="py-1 pr-3">事件流(SSE)</td>
-								<td>sidecar /sessions/:id/events SSE → 引擎逐条镜像 K1(pi_event)+ 水位断档检测(pi_mirror_gap)</td>
+								<td class="py-1 pr-3">工具系统</td>
+								<td class="py-1 pr-3 font-mono text-[10px]">core/extensions/</td>
+								<td class="py-1 text-gray-500 dark:text-gray-400">ToolDefinition(type/function/parameters)+ defineTool 注册;内建 read/write/edit/bash/grep/ls;按白名单注入(banyan /run payload.tools)</td>
 							</tr>
 							<tr class="border-t border-gray-100 dark:border-gray-850">
 								<td class="py-1 pr-3">模型路由</td>
-								<td>/run payload.model → pi models.json 解析 → GLM API 调用</td>
+								<td class="py-1 pr-3 font-mono text-[10px]">core/model-registry.ts</td>
+								<td class="py-1 text-gray-500 dark:text-gray-400">models.json 物化(provider/model/api_key)→ /run payload.model 直查 → GLM API 调用(OpenAI 兼容流式)</td>
+							</tr>
+							<tr class="border-t border-gray-100 dark:border-gray-850">
+								<td class="py-1 pr-3">上下文压缩</td>
+								<td class="py-1 pr-3 font-mono text-[10px]">core/compaction/</td>
+								<td class="py-1 text-gray-500 dark:text-gray-400">estimateTokens → shouldCompact → compact:超长对话自动截断+摘要(尾窗+摘要头),banyan duty 长对话靠此不爆 token</td>
+							</tr>
+							<tr class="border-t border-gray-100 dark:border-gray-850">
+								<td class="py-1 pr-3">分叉与导航</td>
+								<td class="py-1 pr-3 font-mono text-[10px]">core/agent-session(树导航)</td>
+								<td class="py-1 text-gray-500 dark:text-gray-400">navigateTree(编辑重发/分支切换)、fork(从任意节点分出新树);banyan 预留(未启用)</td>
+							</tr>
+							<tr class="border-t border-gray-100 dark:border-gray-850">
+								<td class="py-1 pr-3">技能系统</td>
+								<td class="py-1 pr-3 font-mono text-[10px]">core/skills</td>
+								<td class="py-1 text-gray-500 dark:text-gray-400">ParsedSkillBlock:从 md 提取技能块注入 system prompt;banyan 的 K4 技能投影目标</td>
+							</tr>
+							<tr class="border-t border-gray-100 dark:border-gray-850">
+								<td class="py-1 pr-3">扩展系统</td>
+								<td class="py-1 pr-3 font-mono text-[10px]">core/extensions/runner</td>
+								<td class="py-1 text-gray-500 dark:text-gray-400">ExtensionRunner:自定义工具注册(如 banyan 的 HTTP 回调工具)、before/after 钩子、UI 渲染器</td>
 							</tr>
 						</tbody>
 					</table>
 				</div>
 			</div>
+
+			<!-- ═══ pi × banyan 对接面(引擎怎么调 pi)═══ -->
+			<div
+				class="rounded-xl border border-gray-100 dark:border-gray-850 p-4 text-xs mb-6"
+				data-testid="banyan-arch-pi-usage"
+			>
+				<div class="text-sm font-medium text-black dark:text-white mb-3">
+					banyan 怎么调 pi(HTTP /run 无状态分发)
+				</div>
+				<div class="overflow-x-auto">
+					<table class="w-full text-left">
+						<thead>
+							<tr class="text-gray-400 dark:text-gray-500">
+								<th class="py-1 pr-3 font-medium">步骤</th>
+								<th class="py-1 pr-3 font-medium">谁→谁</th>
+								<th class="py-1 font-medium">做什么</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr class="border-t border-gray-100 dark:border-gray-850">
+								<td class="py-1 pr-3">①</td>
+								<td class="py-1 pr-3">引擎 → sidecar</td>
+								<td class="py-1 text-gray-500 dark:text-gray-400">POST /run {system_prompt, task_text, model, tools, workspace, task_id, http_tools?, callback_base?, wait?} — 引擎把 Agent md 的提示词与工具清单组装进载荷</td>
+							</tr>
+							<tr class="border-t border-gray-100 dark:border-gray-850">
+								<td class="py-1 pr-3">②</td>
+								<td class="py-1 pr-3">sidecar(pi 内核)</td>
+								<td class="py-1 text-gray-500 dark:text-gray-400">创建 AgentSession(system_prompt=系统提示, tools=白名单, model=GLM)→ agent.prompt(task_text) 启动 ReAct 循环</td>
+							</tr>
+							<tr class="border-t border-gray-100 dark:border-gray-850">
+								<td class="py-1 pr-3">③</td>
+								<td class="py-1 pr-3">pi → GLM</td>
+								<td class="py-1 text-gray-500 dark:text-gray-400">Agent 循环内 LLM 调用 GLM API(流式);LLM 请求工具 → pi 执行(如 write_file)→ 结果回注 → LLM 继续 → 最终文本</td>
+							</tr>
+							<tr class="border-t border-gray-100 dark:border-gray-850">
+								<td class="py-1 pr-3">④</td>
+								<td class="py-1 pr-3">事件流回传</td>
+								<td class="py-1 text-gray-500 dark:text-gray-400">sidecar /sessions/:id/events SSE → 引擎 HttpWorker 逐条镜像 K1(pi_event)+ 水位断档检测(pi_mirror_gap)</td>
+							</tr>
+							<tr class="border-t border-gray-100 dark:border-gray-850">
+								<td class="py-1 pr-3">⑤</td>
+								<td class="py-1 pr-3">结果回收</td>
+								<td class="py-1 text-gray-500 dark:text-gray-400">wait=true → /run 阻塞返回 RunResult{text,usage};wait=false → agent_result(run_id) 轮询 /runs/:run_id 收取;agent_inject 运行中注入消息(steer/followUp)</td>
+							</tr>
+							<tr class="border-t border-gray-100 dark:border-gray-850">
+								<td class="py-1 pr-3">⑥</td>
+								<td class="py-1 pr-3">工具回调</td>
+								<td class="py-1 text-gray-500 dark:text-gray-400">执行者/审查者的 http_tools(kb_glob/kb_read 等)→ pi 循环调用 → POST callback_base/agent-tools/{tool} → 引擎进程内直查 → JSON 回给 pi → LLM 继续</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+
+			<!-- ═══ 存储架构 ═══ -->
 
 			<!-- ═══ 存储架构 ═══ -->
 			<div
