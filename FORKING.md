@@ -341,7 +341,14 @@ env 覆盖生效）。
 **纪律**：一个 `BANYAN_HOME` 收纳三进程全部状态，杜绝"sidecar 落 `~/.banyan`
 死目录、WebUI 落 `backend/data`"的活分裂。fork 侧的义务只有一条——**必须由
 启动脚本显式给 `DATA_DIR`**（fork 后端从 `open_webui.env.DATA_DIR` 定位
-`webui.db/vector_db/uploads/cache`，缺省回落到仓库内 `backend/data`，属分裂根）。
+`webui.db/vector_db/uploads/cache`，缺省回落到仓库内 `backend/data`，属分裂根；
+旧库已迁 `$HOME_DIR/webui`（即 `~/.banyan/webui`），`<fork>/backend/data` 仅余
+迁移前遗留，勿再写入）。
+
+**启动告警**（RF-38 封堵，仅告警不搬家）：`DATA_DIR` env 未显式设置且
+`<fork>/backend/data/webui.db` 仍存在时，后端启动即打醒目 WARNING
+（检测到旧数据目录，建议迁移或显式设置 DATA_DIR）——防止不带 `DATA_DIR`
+的启动静默采用迁移前旧库、与 `$HOME_DIR/webui` 形成双真相。
 
 **env 约定**（`scripts/start-all.sh` 已统一注入，手工起进程时须自带）：
 

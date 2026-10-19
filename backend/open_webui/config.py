@@ -83,6 +83,17 @@ def run_migrations():
 if ENABLE_DB_MIGRATIONS:
     run_migrations()
 
+# D26(存储单根,FORKING.md §3e):不显式设 DATA_DIR 时后端静默回落仓库内
+# backend/data——迁移后若旧 webui.db 仍留在该处即成"双真相"陷阱。此处仅
+# 醒目告警,不搬家、不动用户数据。
+if not os.getenv('DATA_DIR') and (BACKEND_DIR / 'data' / 'webui.db').exists():
+    log.warning(
+        f"\n"
+        f"⚠️  WARNING: legacy data directory detected at {BACKEND_DIR / 'data'} (webui.db present)\n"
+        "    DATA_DIR env is NOT set — this legacy database will be used silently.\n"
+        "    检测到旧数据目录,建议迁移或显式设置 DATA_DIR(见 docs/FORKING.md §3e / scripts/migrate-to-home.sh)\n"
+    )
+
 
 async def import_legacy_config_json():
     """Migrate legacy config.json → database on first run."""
@@ -2081,7 +2092,9 @@ AUTOMATION_MIN_INTERVAL = os.getenv('AUTOMATION_MIN_INTERVAL', '')
 
 AUTOMATION_AUTH_TOKEN_EXPIRES_IN = os.getenv('AUTOMATION_AUTH_TOKEN_EXPIRES_IN', '1h')
 
-ENABLE_NOTES = os.getenv('ENABLE_NOTES', 'True').lower() == 'true'
+# D23(完整方案.md 弃用裁决):Notes UI 已退役——默认不可再写 fork notes 表;
+# 仅改缺省值,上游代码零删除(notes 路由全部经 check_notes_access 关闸)。
+ENABLE_NOTES = os.getenv('ENABLE_NOTES', 'False').lower() == 'true'
 
 ENABLE_USER_STATUS = os.getenv('ENABLE_USER_STATUS', 'True').lower() == 'true'
 
