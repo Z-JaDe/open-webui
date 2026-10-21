@@ -409,6 +409,7 @@
 		{ a: '/sessions/:id/tree · fork · switch', b: 'PiSessions 卡(webui 只读)+ 引擎树投影', c: '会话树 DAG 展示;fork/switch 引擎侧预留' },
 		{ a: '/health', b: 'BanyanEngineStatus(webui 走 /banyan/api/health)', c: 'sidecar 健康红绿点' },
 		{ a: 'models.json(启动物化)', b: '引擎 cfg.tiers → model_map(engine.py:268)', c: '档位→具体模型 id,由每次 /run 载荷直带' },
-		{ a: 'Pi 会话 JSONL', b: 'K1 的对账副本', c: '可清理;事实正本永远在 K1 事件账' }
+		{ a: 'Pi 会话 JSONL', b: 'K1 的对账副本', c: '可清理;事实正本永远在 K1 事件账' },
+		{ a: 'pi-goal /goals·/cards(v3 新)', b: '引擎 GoalClient+触发器(runners/goal_client.py;BANYAN_GOAL_URL)', c: 'goal 内核(pi-durable):六相任务·常驻 subagent·人卡·预算·证据' }
 	];
 </script>

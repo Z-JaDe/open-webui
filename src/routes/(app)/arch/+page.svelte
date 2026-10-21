@@ -96,7 +96,7 @@
 				>
 					<div class="font-medium text-black dark:text-white">系统总览</div>
 					<p class="text-gray-500 dark:text-gray-400">
-						三个进程:引擎(:8000,编排调度·状态正本·K1 事件流)· sidecar(:8100,pi 执行内核·沙箱工具)· WebUI(:8080,身份认证·界面呈现)。
+						四个进程:引擎(:8000,触发器·K1 事实正本·store 工具回调)· pi-sidecar(:8100,pi 执行内核·沙箱工具)· <b>pi-goal(:8101,goal 内核·durable 执行正本,v3 新)</b>· WebUI(:8080,身份认证·界面呈现)。
 					</p>
 					<p class="text-gray-500 dark:text-gray-400">
 						存储根(BANYAN_HOME):
@@ -234,11 +234,11 @@
 						class="group rounded-xl border border-gray-100 dark:border-gray-850 p-4 hover:border-gray-300 dark:hover:border-gray-700 transition"
 					>
 						<div class="flex items-center justify-between">
-							<div class="text-sm font-medium text-black dark:text-white">banyan 编排与数据</div>
+							<div class="text-sm font-medium text-black dark:text-white">banyan goal 内核与统一机制(v3)</div>
 							<span class="text-xs text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300">/arch/banyan ↗</span>
 						</div>
 						<p class="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
-							方案流状态机(人只出现两个触点)· 波次执行引擎(并发帽/失败语义)· 三种黑板与正本 · 机械闸门——全图示
+							goal 六相状态机 · 统一机制链(触发→goal→人卡→结算)· v2→v3 迁移对照 · 四机械保证——全图示
 						</p>
 					</a>
 					<a

@@ -1,10 +1,10 @@
 <script lang="ts">
-	// /arch/banyan:banyan 专属编排子页——方案流·波次·正本·闸门,全图示。
-	// 事实全部出自引擎源码:orchestration/{scheduler,attack}.py · human/{inbox,api,chat_store}.py · runners/agent_tools.py。
+	// /arch/banyan(v3 重画):goal 内核架构——pi-durable 之上的薄编排。
+	// 事实出处:banyan/pi-goal 源码(goal.ts 六相/subagent.ts 常驻子代理/docs.ts 提交文档)
+	// + 方案-v3-薄banyan-on-pi-durable.md;v2 编排(波次/攻击门)仍在引擎,标记迁移态。
 	import { onMount } from 'svelte';
 
 	onMount(() => {
-		// 与 /arch/pi 同款:向父页上报内容高度(被 iframe 嵌入时用)
 		const post = () => {
 			if (window.parent !== window) {
 				const inner = document.querySelector('.max-w-full');
@@ -29,216 +29,201 @@
 </script>
 
 <svelte:head>
-	<title>banyan 编排架构</title>
+	<title>banyan goal 内核架构</title>
 </svelte:head>
 
 <div class="h-screen overflow-y-auto">
 	<div class="max-w-full mx-auto w-full px-4 py-6">
 		<div class="flex items-baseline justify-between mb-4">
 			<h1 class="text-lg font-semibold text-gray-900 dark:text-white">
-				banyan 编排与数据:方案流 · 波次 · 正本 · 闸门
+				banyan v3:goal 内核与统一机制(pi-durable)
 			</h1>
 			<span class="text-[11px] text-gray-400 dark:text-gray-500">
-				引擎 :8000 · Python · 事实出处 orchestration/ + human/ 源码
+				pi-goal :8101 · durable SQLite 执行正本 · 方案 v3 P1 已落地
 			</span>
 		</div>
 
-		<!-- ═══ 图一:方案流状态机 ═══ -->
+		<!-- ═══ 图一:goal 六相状态机 ═══ -->
 		<div class="rounded-xl border border-gray-100 dark:border-gray-850 p-3 mb-6">
 			<div class="text-sm font-medium text-black dark:text-white mb-2">
-				图一 · 方案流状态机——人只出现在「批准方案」「处置信箱」两个触点
+				图一 · goal 任务六相——一条 durable 提交线,崩溃即续跑
 			</div>
-			<svg viewBox="0 0 1080 400" class="w-full h-auto" role="img" aria-label="方案流状态机">
+			<svg viewBox="0 0 1080 330" class="w-full h-auto" role="img" aria-label="goal 六相状态机">
 				<defs>
-					<marker id="b-ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+					<marker id="g3-ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
 						<path d="M0,0 L10,5 L0,10 z" class="fill-gray-400 dark:fill-gray-600" />
 					</marker>
 				</defs>
-				<!-- 主路径 第一行 -->
 				<g font-size="10.5" text-anchor="middle">
-					<rect x="14" y="30" width="128" height="58" rx="8" class="fill-gray-50 dark:fill-gray-900 stroke-gray-300 dark:stroke-gray-700" />
-					<text x="78" y="54" font-weight="600" class="fill-gray-800 dark:fill-gray-100">人 / 秘书</text>
-					<text x="78" y="72" class="fill-gray-500 dark:fill-gray-400">理诉求 · 出方案卡</text>
+					<rect x="14" y="40" width="150" height="76" rx="8" class="fill-gray-50 dark:fill-gray-900 stroke-gray-300 dark:stroke-gray-700" />
+					<text x="89" y="64" font-weight="600" class="fill-gray-800 dark:fill-gray-100">① seed</text>
+					<text x="89" y="82" class="fill-gray-500 dark:fill-gray-400">建管理者会话(引擎 md 逐字)</text>
+					<text x="89" y="98" class="fill-gray-500 dark:fill-gray-400">GoalIndex 落账 · configure</text>
 
-					<rect x="172" y="30" width="150" height="58" rx="8" class="fill-gray-50 dark:fill-gray-900 stroke-gray-300 dark:stroke-gray-700" />
-					<text x="247" y="54" font-weight="600" class="fill-gray-800 dark:fill-gray-100">级联准入</text>
-					<text x="247" y="72" class="fill-gray-500 dark:fill-gray-400">规则→单席→镜头→人</text>
+					<rect x="192" y="40" width="150" height="76" rx="8" class="fill-gray-50 dark:fill-gray-900 stroke-gray-300 dark:stroke-gray-700" />
+					<text x="267" y="64" font-weight="600" class="fill-gray-800 dark:fill-gray-100">② plan</text>
+					<text x="267" y="82" class="fill-gray-500 dark:fill-gray-400">submit(objective) 等答案</text>
+					<text x="267" y="98" class="fill-gray-500 dark:fill-gray-400">requestId 幂等(崩溃不重发)</text>
 
-					<rect x="352" y="30" width="104" height="58" rx="8" class="fill-gray-50 dark:fill-gray-900 stroke-gray-300 dark:stroke-gray-700" />
-					<text x="404" y="54" font-weight="600" class="fill-gray-800 dark:fill-gray-100">Ticket</text>
-					<text x="404" y="72" class="fill-gray-500 dark:fill-gray-400">立案</text>
+					<rect x="370" y="40" width="190" height="76" rx="8" class="fill-amber-50/60 dark:fill-gray-900 stroke-amber-400/70 dark:stroke-gray-600" stroke-width="1.5" />
+					<text x="465" y="64" font-weight="600" class="fill-gray-900 dark:fill-gray-100">③ execute(轮次循环)</text>
+					<text x="465" y="82" class="fill-gray-500 dark:fill-gray-400">每轮一 submit;goal_report 收口</text>
+					<text x="465" y="98" class="fill-gray-500 dark:fill-gray-400">预算=轮数帽+墙钟 · 红测前置</text>
 
-					<rect x="486" y="30" width="140" height="58" rx="8" class="fill-gray-50 dark:fill-gray-900 stroke-gray-300 dark:stroke-gray-700" />
-					<text x="556" y="54" font-weight="600" class="fill-gray-800 dark:fill-gray-100">探索(探索者)</text>
-					<text x="556" y="72" class="fill-gray-500 dark:fill-gray-400">方案卡 + 沙盘推演</text>
+					<rect x="588" y="40" width="160" height="76" rx="8" class="fill-blue-50 dark:fill-gray-900 stroke-blue-300 dark:stroke-gray-700" stroke-width="1.5" />
+					<text x="668" y="64" font-weight="600" class="fill-gray-900 dark:fill-gray-100">④ card(人卡)</text>
+					<text x="668" y="82" class="fill-gray-500 dark:fill-gray-400">CardIndex 开卡;相内 watchDoc</text>
+					<text x="668" y="98" class="fill-gray-500 dark:fill-gray-400">HTTP resolve → approve/reject</text>
 
-					<rect x="656" y="30" width="128" height="58" rx="8" class="fill-blue-50 dark:fill-gray-900 stroke-blue-300 dark:stroke-gray-700" stroke-width="1.5" />
-					<text x="720" y="54" font-weight="600" class="fill-gray-900 dark:fill-gray-100">人批准(触点①)</text>
-					<text x="720" y="72" class="fill-gray-500 dark:fill-gray-400">run_plan(attack_gate)</text>
+					<rect x="776" y="40" width="140" height="76" rx="8" class="fill-gray-50 dark:fill-gray-900 stroke-gray-300 dark:stroke-gray-700" />
+					<text x="846" y="64" font-weight="600" class="fill-gray-800 dark:fill-gray-100">⑤ verify</text>
+					<text x="846" y="82" class="fill-gray-500 dark:fill-gray-400">绿测 exit 0 · 交付物实存</text>
+					<text x="846" y="98" class="fill-gray-500 dark:fill-gray-400">只验存在与形状,不判内容</text>
 
-					<rect x="814" y="30" width="150" height="58" rx="8" class="fill-amber-50/60 dark:fill-gray-900 stroke-amber-400/70 dark:stroke-gray-600" stroke-width="1.5" />
-					<text x="889" y="54" font-weight="600" class="fill-gray-900 dark:fill-gray-100">攻击门(开工前)</text>
-					<text x="889" y="72" class="fill-gray-500 dark:fill-gray-400">3×审查者三角度</text>
+					<rect x="944" y="40" width="122" height="76" rx="8" class="fill-green-50 dark:fill-gray-900 stroke-green-400/50 dark:stroke-gray-700" />
+					<text x="1005" y="64" font-weight="600" class="fill-gray-900 dark:fill-gray-100">⑥ settle</text>
+					<text x="1005" y="82" class="fill-gray-500 dark:fill-gray-400">终态落 GoalIndex</text>
+					<text x="1005" y="98" class="fill-gray-500 dark:fill-gray-400">summary/verified 随结果</text>
 				</g>
-				<line x1="142" y1="59" x2="170" y2="59" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#b-ar)" />
-				<line x1="322" y1="59" x2="350" y2="59" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#b-ar)" />
-				<line x1="456" y1="59" x2="484" y2="59" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#b-ar)" />
-				<line x1="626" y1="59" x2="654" y2="59" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#b-ar)" />
-				<line x1="784" y1="59" x2="812" y2="59" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#b-ar)" />
+				<line x1="164" y1="78" x2="190" y2="78" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#g3-ar)" />
+				<line x1="342" y1="78" x2="368" y2="78" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#g3-ar)" />
+				<line x1="560" y1="78" x2="586" y2="78" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#g3-ar)" />
+				<line x1="748" y1="78" x2="774" y2="78" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#g3-ar)" />
+				<line x1="916" y1="78" x2="942" y2="78" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#g3-ar)" />
 
-				<!-- 拦截分支:攻击门 → 豁免重入 -->
-				<line x1="889" y1="88" x2="889" y2="122" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#b-ar)" />
-				<text x="897" y="110" font-size="9.5" class="fill-gray-400 dark:fill-gray-500">blocked / unreviewed → 方案不开工</text>
-				<rect x="744" y="124" width="220" height="40" rx="8" class="fill-transparent stroke-gray-300 dark:stroke-gray-700" stroke-dasharray="4 3" />
-				<text x="854" y="148" text-anchor="middle" font-size="10" class="fill-gray-500 dark:fill-gray-400">拦截 → 信箱卡 → 人豁免或驳回(重入)</text>
-
-				<!-- 通过 → 波次执行(第二行,右到左) -->
-				<line x1="889" y1="164" x2="889" y2="196" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#b-ar)" />
-				<text x="897" y="184" font-size="9.5" class="fill-gray-400 dark:fill-gray-500">通过 → 开工</text>
-				<g font-size="10.5" text-anchor="middle">
-					<rect x="790" y="198" width="174" height="58" rx="8" class="fill-amber-50/60 dark:fill-gray-900 stroke-amber-400/70 dark:stroke-gray-600" stroke-width="1.5" />
-					<text x="877" y="222" font-weight="600" class="fill-gray-900 dark:fill-gray-100">波次执行(执行者)</text>
-					<text x="877" y="240" class="fill-gray-500 dark:fill-gray-400">波间顺序 · 波内并发(帽 4)</text>
-
-					<rect x="560" y="198" width="170" height="58" rx="8" class="fill-gray-50 dark:fill-gray-900 stroke-gray-300 dark:stroke-gray-700" />
-					<text x="645" y="222" font-weight="600" class="fill-gray-800 dark:fill-gray-100">登记簿断言(红/绿)</text>
-					<text x="645" y="240" class="fill-gray-500 dark:fill-gray-400">orch_regs 两轨 · 回归零红</text>
-
-					<rect x="330" y="198" width="170" height="58" rx="8" class="fill-amber-50/60 dark:fill-gray-900 stroke-amber-400/70 dark:stroke-gray-600" stroke-width="1.5" />
-					<text x="415" y="222" font-weight="600" class="fill-gray-900 dark:fill-gray-100">完成门(收口)</text>
-					<text x="415" y="240" class="fill-gray-500 dark:fill-gray-400">四条件,不过 = blocked+信箱</text>
-
-					<rect x="96" y="198" width="174" height="58" rx="8" class="fill-green-50 dark:fill-gray-900 stroke-green-400/50 dark:stroke-gray-700" />
-					<text x="183" y="222" font-weight="600" class="fill-gray-900 dark:fill-gray-100">finished(触点②)</text>
-					<text x="183" y="240" class="fill-gray-500 dark:fill-gray-400">信箱完成卡 + K2 知识结算</text>
+				<!-- 终止语义 -->
+				<g font-size="10" text-anchor="middle">
+					<rect x="370" y="170" width="378" height="64" rx="8" class="fill-transparent stroke-gray-300 dark:stroke-gray-700" stroke-dasharray="4 3" />
+					<text x="559" y="192" font-weight="600" class="fill-gray-600 dark:fill-gray-400">终止路径(全部落 GoalIndex,绝不静默)</text>
+					<text x="559" y="210" class="fill-gray-500 dark:fill-gray-400">预算尽=failed · 人卡 reject=aborted · 红测未红=failed(no-op 自证)</text>
+					<text x="559" y="226" class="fill-gray-500 dark:fill-gray-400">abort(HTTP)=aborted · verify 不过=failed+原因</text>
 				</g>
-				<line x1="790" y1="227" x2="732" y2="227" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#b-ar)" />
-				<line x1="560" y1="227" x2="502" y2="227" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#b-ar)" />
-				<line x1="330" y1="227" x2="272" y2="227" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#b-ar)" />
-
-				<!-- 失败/模糊 分支 -->
-				<rect x="330" y="300" width="470" height="58" rx="8" class="fill-gray-50 dark:fill-gray-900 stroke-gray-300 dark:stroke-gray-700" />
-				<g font-size="10.5" text-anchor="middle">
-					<text x="565" y="324" font-weight="600" class="fill-gray-800 dark:fill-gray-100">失败 / 模糊 → 任务管理器裁决(glm-5.3)→ 信箱卡 → 人处置 → 恢复</text>
-					<text x="565" y="342" class="fill-gray-500 dark:fill-gray-400">机械规则先行(重试/依赖/降档是代码关节),LLM 只做裁量,宁可 note 不可乱 escalate</text>
-				</g>
-				<line x1="645" y1="256" x2="645" y2="298" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#b-ar)" />
-				<text x="652" y="282" font-size="9.5" class="fill-gray-400 dark:fill-gray-500">失败 / 模糊</text>
-				<text x="14" y="390" font-size="10.5" class="fill-gray-400 dark:fill-gray-500">源码锚点:攻击门 orchestration/attack.py:80-108 · run_plan 装配 human/api.py:998/1194 · 完成门 scheduler._completion_gate:381 · 回滚预案落信箱 scheduler:435-444</text>
+				<line x1="465" y1="116" x2="465" y2="168" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#g3-ar)" />
+				<line x1="668" y1="116" x2="668" y2="168" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#g3-ar)" />
+				<text x="14" y="300" font-size="10.5" class="fill-gray-400 dark:fill-gray-500">机制件:ReportDoc(goal_report 写/goal 读——注意力锚)· PlanDoc(plan_update 写/每轮回放)· Subagents(常驻子代理注册表,答案经 reporter 回流)——全部是与条目同事务提交的 durable 文档,压缩不丢。</text>
 			</svg>
 		</div>
 
-		<!-- ═══ 图二:波次执行引擎 ═══ -->
+		<!-- ═══ 图二:统一机制链 ═══ -->
 		<div class="rounded-xl border border-gray-100 dark:border-gray-850 p-3 mb-6">
 			<div class="text-sm font-medium text-black dark:text-white mb-2">
-				图二 · 波次执行引擎——谁在跑、失败怎么办(没有 LLM 级重试)
+				图二 · 统一机制——一切审查/准入/裁决都是「触发 → goal → (异常→再触发) → 任务」
 			</div>
-			<svg viewBox="0 0 1080 300" class="w-full h-auto" role="img" aria-label="波次执行引擎">
+			<svg viewBox="0 0 1080 300" class="w-full h-auto" role="img" aria-label="统一机制链">
 				<g font-size="10.5" text-anchor="middle">
-					<rect x="14" y="30" width="200" height="66" rx="8" class="fill-gray-50 dark:fill-gray-900 stroke-gray-300 dark:stroke-gray-700" />
-					<text x="114" y="54" font-weight="600" class="fill-gray-800 dark:fill-gray-100">run_plan(方案)</text>
-					<text x="114" y="72" class="fill-gray-500 dark:fill-gray-400">scheduler.py:209 · 逐波循环</text>
-					<text x="114" y="88" class="fill-gray-500 dark:fill-gray-400">波间严格顺序</text>
+					<!-- 触发层 -->
+					<rect x="14" y="24" width="200" height="88" rx="8" class="fill-blue-50 dark:fill-gray-900 stroke-blue-300 dark:stroke-gray-700" stroke-width="1.5" />
+					<text x="114" y="48" font-weight="600" class="fill-gray-900 dark:fill-gray-100">触发层(引擎持有)</text>
+					<text x="114" y="68" class="fill-gray-500 dark:fill-gray-400">cron(aut_items)· git watch(新)</text>
+					<text x="114" y="84" class="fill-gray-500 dark:fill-gray-400">K1 事件订阅 · 手动</text>
+					<text x="114" y="100" class="fill-gray-500 dark:fill-gray-400">requestId 幂等 → 重启不重发</text>
 
-					<rect x="252" y="30" width="220" height="66" rx="8" class="fill-gray-50 dark:fill-gray-900 stroke-gray-300 dark:stroke-gray-700" />
-					<text x="362" y="54" font-weight="600" class="fill-gray-800 dark:fill-gray-100">波内 asyncio.TaskGroup</text>
-					<text x="362" y="72" class="fill-gray-500 dark:fill-gray-400">每任务一协程(:339-343)</text>
-					<text x="362" y="88" class="fill-gray-500 dark:fill-gray-400">_Gate 信号量并发帽 = 4(:143)</text>
+					<!-- goal 内核 -->
+					<rect x="272" y="24" width="240" height="88" rx="8" class="fill-amber-50/60 dark:fill-gray-900 stroke-amber-400/70 dark:stroke-gray-600" stroke-width="1.5" />
+					<text x="392" y="48" font-weight="600" class="fill-gray-900 dark:fill-gray-100">goal 内核(pi-goal :8101)</text>
+					<text x="392" y="68" class="fill-gray-500 dark:fill-gray-400">pi-durable Harness · SQLite 执行正本</text>
+					<text x="392" y="84" class="fill-gray-500 dark:fill-gray-400">六相任务 · 常驻 subagent · 人卡</text>
+					<text x="392" y="100" class="fill-gray-500 dark:fill-gray-400">HTTP:/goals /cards /usage /health</text>
 
-					<rect x="510" y="30" width="230" height="66" rx="8" class="fill-amber-50/60 dark:fill-gray-900 stroke-amber-400/70 dark:stroke-gray-600" stroke-width="1.5" />
-					<text x="625" y="54" font-weight="600" class="fill-gray-900 dark:fill-gray-100">HttpWorker.run(每任务)</text>
-					<text x="625" y="72" class="fill-gray-500 dark:fill-gray-400">engine.py:280 唯一实例 · :544 调用</text>
-					<text x="625" y="88" class="fill-gray-500 dark:fill-gray-400">POST /run wait=true → pi 内核</text>
+					<!-- 管理者+子代理 -->
+					<rect x="570" y="24" width="240" height="88" rx="8" class="fill-gray-50 dark:fill-gray-900 stroke-gray-300 dark:stroke-gray-700" />
+					<text x="690" y="48" font-weight="600" class="fill-gray-800 dark:fill-gray-100">管理者会话 + 常驻子代理</text>
+					<text x="690" y="68" class="fill-gray-500 dark:fill-gray-400">instructions=引擎 md(逐字)· GLM</text>
+					<text x="690" y="84" class="fill-gray-500 dark:fill-gray-400">subagent spawn/send/stop · 答案回流</text>
+					<text x="690" y="100" class="fill-gray-500 dark:fill-gray-400">CodingTools 沙箱(工作区 cwd)</text>
 
-					<rect x="778" y="30" width="180" height="66" rx="8" class="fill-gray-50 dark:fill-gray-900 stroke-gray-300 dark:stroke-gray-700" />
-					<text x="868" y="54" font-weight="600" class="fill-gray-800 dark:fill-gray-100">RunResult 回收</text>
-					<text x="868" y="72" class="fill-gray-500 dark:fill-gray-400">交付物落工作区</text>
-					<text x="868" y="88" class="fill-gray-500 dark:fill-gray-400">pi_event 镜像 K1</text>
+					<!-- 人的触点 -->
+					<rect x="868" y="24" width="198" height="88" rx="8" class="fill-blue-50 dark:fill-gray-900 stroke-blue-300 dark:stroke-gray-700" />
+					<text x="967" y="48" font-weight="600" class="fill-gray-900 dark:fill-gray-100">人(信箱/卡)</text>
+					<text x="967" y="68" class="fill-gray-500 dark:fill-gray-400">GET /cards → 引擎镜像 → 信箱卡</text>
+					<text x="967" y="84" class="fill-gray-500 dark:fill-gray-400">POST /cards/:id/resolve</text>
+					<text x="967" y="100" class="fill-gray-500 dark:fill-gray-400">approve=续跑 · reject=aborted</text>
 				</g>
-				<line x1="214" y1="63" x2="250" y2="63" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#b-ar)" />
-				<line x1="472" y1="63" x2="508" y2="63" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#b-ar)" />
-				<line x1="740" y1="63" x2="776" y2="63" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#b-ar)" />
+				<line x1="214" y1="68" x2="270" y2="68" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#g3-ar)" />
+				<line x1="512" y1="68" x2="568" y2="68" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#g3-ar)" />
+				<line x1="810" y1="68" x2="866" y2="68" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#g3-ar)" />
+				<line x1="967" y1="112" x2="967" y2="140" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#g3-ar)" />
+				<line x1="967" y1="140" x2="392" y2="140" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" />
+				<line x1="392" y1="140" x2="392" y2="112" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#g3-ar)" />
+				<text x="680" y="134" text-anchor="middle" font-size="9.5" class="fill-gray-400 dark:fill-gray-500">处置回流(watchDoc 唤醒等待中的 goal)</text>
 
-				<!-- 失败语义 -->
 				<g font-size="10.5" text-anchor="middle">
-					<rect x="14" y="150" width="330" height="66" rx="8" class="fill-gray-50 dark:fill-gray-900 stroke-gray-300 dark:stroke-gray-700" />
-					<text x="179" y="174" font-weight="600" class="fill-gray-800 dark:fill-gray-100">失败 / 传染 → _propagate_skips(:682)</text>
-					<text x="179" y="192" class="fill-gray-500 dark:fill-gray-400">_fail / _skip(:718/721),下游任务跳过</text>
-					<text x="179" y="208" class="fill-gray-500 dark:fill-gray-400">没有 LLM 级自动重试</text>
+					<rect x="14" y="180" width="486" height="88" rx="8" class="fill-gray-50 dark:fill-gray-900 stroke-gray-300 dark:stroke-gray-700" />
+					<text x="257" y="204" font-weight="600" class="fill-gray-800 dark:fill-gray-100">场景一:每日交叉审查(cron 02:00)</text>
+					<text x="257" y="224" class="fill-gray-500 dark:fill-gray-400">goal(3×审查者并行 + 汇总)→ 异常报告</text>
+					<text x="257" y="240" class="fill-gray-500 dark:fill-gray-400">→ 人卡或自动触发深审 goal → 结论提交执行 goal</text>
+					<text x="257" y="258" class="fill-gray-500 dark:fill-gray-400">全程同一套原语,无专属代码路径</text>
 
-					<rect x="374" y="150" width="330" height="66" rx="8" class="fill-blue-50 dark:fill-gray-900 stroke-blue-300 dark:stroke-gray-700" stroke-width="1.5" />
-					<text x="539" y="174" font-weight="600" class="fill-gray-900 dark:fill-gray-100">唯一重跑 = 运行时依赖单回路(:450-467)</text>
-					<text x="539" y="192" class="fill-gray-500 dark:fill-gray-400">发现新依赖 → 回炉补单</text>
-					<text x="539" y="208" class="fill-gray-500 dark:fill-gray-400">budget.charge_rerun 计费,可预算熔断</text>
-
-					<rect x="734" y="150" width="330" height="66" rx="8" class="fill-gray-50 dark:fill-gray-900 stroke-gray-300 dark:stroke-gray-700" />
-					<text x="899" y="174" font-weight="600" class="fill-gray-800 dark:fill-gray-100">失败诚实传播(RFF P0)</text>
-					<text x="899" y="192" class="fill-gray-500 dark:fill-gray-400">/run 非 2xx、缺 runId、断档</text>
-					<text x="899" y="208" class="fill-gray-500 dark:fill-gray-400">一律落 pi_mirror_gap,绝不静默</text>
+					<rect x="540" y="180" width="526" height="88" rx="8" class="fill-gray-50 dark:fill-gray-900 stroke-gray-300 dark:stroke-gray-700" />
+					<text x="803" y="204" font-weight="600" class="fill-gray-800 dark:fill-gray-100">场景二:代码变更审查(git watch)</text>
+					<text x="803" y="224" class="fill-gray-500 dark:fill-gray-400">变更(去抖+最小间隔)→ 同一条链</text>
+					<text x="803" y="240" class="fill-gray-500 dark:fill-gray-400">审查 goal → 异常 → 深审 → 执行</text>
+					<text x="803" y="258" class="fill-gray-500 dark:fill-gray-400">机制交互统一:触发器只做一件事——create_goal(requestId)</text>
 				</g>
-				<line x1="625" y1="96" x2="625" y2="120" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" />
-				<line x1="180" y1="120" x2="898" y2="120" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" />
-				<line x1="180" y1="120" x2="180" y2="148" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#b-ar)" />
-				<line x1="539" y1="120" x2="539" y2="148" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#b-ar)" />
-				<line x1="898" y1="120" x2="898" y2="148" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#b-ar)" />
-				<text x="14" y="256" font-size="10.5" class="fill-gray-400 dark:fill-gray-500">模糊决策(执行中发现)→ 波内 spawn_agent 拉交叉分析(审查者/任务管理器),见 /arch/pi 图四</text>
 			</svg>
 		</div>
 
-		<!-- ═══ 图三:三种黑板与正本 ═══ -->
+		<!-- ═══ 图三:v2 → v3 对照 ═══ -->
 		<div class="rounded-xl border border-gray-100 dark:border-gray-850 p-3 mb-6">
-			<div class="text-sm font-medium text-black dark:text-white mb-3">
-				图三 · 三种黑板 + 正本纪律——Agent 之间永不直接对话,LLM 间协作由调度代码搬运数据
+			<div class="text-sm font-medium text-black dark:text-white mb-2">
+				图三 · v2 → v3 对照——旧机制去哪了(现状:v2 编排仍在引擎并行运行,P3 拆除)
 			</div>
-			<div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-[11px]">
-				<div class="rounded-lg border border-blue-200/70 dark:border-gray-800 bg-blue-50/50 dark:bg-gray-900 p-3">
-					<div class="font-semibold text-gray-800 dark:text-gray-200">① K1 事件账(唯一事实正本)</div>
-					<div class="text-gray-500 dark:text-gray-400 mt-1">events/ jsonl · append + fsync · 永久可回放。pi_event / inbox.opened / file.stored / task_surface_turn 全是它的行。</div>
-				</div>
-				<div class="rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-3">
-					<div class="font-semibold text-gray-800 dark:text-gray-200">② 工作区文件(交付物)</div>
-					<div class="text-gray-500 dark:text-gray-400 mt-1">BANYAN_HOME/workspace,jail 根;执行者写、审查者读;附件 .banyan-uploads 随工作区。</div>
-				</div>
-				<div class="rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-3">
-					<div class="font-semibold text-gray-800 dark:text-gray-200">③ 信箱 / 审卡(人的触点)</div>
-					<div class="text-gray-500 dark:text-gray-400 mt-1">InboxStore.land 先落 K1 inbox.opened 再投卡;mailbox_send(任务管理器);notice 7 天过期;/inbox 四视图+徽标。</div>
-				</div>
-				<div class="rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-3">
-					<div class="font-semibold text-gray-800 dark:text-gray-200">断言登记簿 orch_regs</div>
-					<div class="text-gray-500 dark:text-gray-400 mt-1">红/绿两轨:修复类开工前红测必须红(防 no-op 自证),交付时红绿双绿;完成门第①条件。</div>
-				</div>
-				<div class="rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-3">
-					<div class="font-semibold text-gray-800 dark:text-gray-200">知识仓(git, K2-K5)</div>
-					<div class="text-gray-500 dark:text-gray-400 mt-1">cards/records/agents/prompts 正本,版本化;技能/提示词是单向投影缓存,运行时由引擎全文下发进提示词。</div>
-				</div>
-				<div class="rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-3">
-					<div class="font-semibold text-gray-800 dark:text-gray-200">复核隔离(审查者输入)</div>
-					<div class="text-gray-500 dark:text-gray-400 mt-1">证据白名单:diff + 断言留痕;执行者自述被剥离——取证靠真跑命令,不靠读自述。</div>
-				</div>
+			<div class="overflow-x-auto">
+				<table class="w-full text-left text-[11px]">
+					<thead>
+						<tr class="text-gray-400 dark:text-gray-500">
+							<th class="py-1 pr-3 font-medium">v2 机制(代码)</th>
+							<th class="py-1 pr-3 font-medium">v3 表达</th>
+							<th class="py-1 font-medium">落地位置</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each migrations as m}
+							<tr class="border-t border-gray-100 dark:border-gray-850">
+								<td class="py-1 pr-3 text-gray-700 dark:text-gray-300 whitespace-nowrap">{m.old}</td>
+								<td class="py-1 pr-3 text-gray-500 dark:text-gray-400">{m.now}</td>
+								<td class="py-1 text-gray-500 dark:text-gray-400 whitespace-nowrap">{m.where}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
 			</div>
 		</div>
 
-		<!-- ═══ 纪律闸门一览 ═══ -->
+		<!-- ═══ 四机械保证 ═══ -->
 		<div class="rounded-xl border border-gray-100 dark:border-gray-850 p-3">
-			<div class="text-sm font-medium text-black dark:text-white mb-2">内置机械闸门(代码关节,不是提示词约定)</div>
-			<div class="flex flex-wrap gap-2 text-[11px]">
-				{#each gates as g}
-					<div class="rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-3 py-2">
-						<span class="font-semibold text-gray-800 dark:text-gray-200">{g.n}</span>
-						<span class="text-gray-500 dark:text-gray-400"> — {g.d}</span>
+			<div class="text-sm font-medium text-black dark:text-white mb-2">四条机械保证(v3 落点)</div>
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px]">
+				{#each guarantees as g}
+					<div class="rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-3">
+						<div class="font-semibold text-gray-800 dark:text-gray-200">{g.n}</div>
+						<div class="text-gray-500 dark:text-gray-400 mt-1">{g.d}</div>
 					</div>
 				{/each}
 			</div>
+			<p class="text-[10.5px] text-gray-400 dark:text-gray-500 mt-2">
+				正本纪律(v3 修订):执行态正本归 pi-goal durable 存储(断点续跑的前提);K1 仍是全系统事实与审计正本(引擎镜像);知识正本不动。
+			</p>
 		</div>
 	</div>
 </div>
 
 <script context="module">
-	const gates = [
-		{ n: '红绿强制', d: '修复类开工前红测必须红,交付红绿双绿;未红 = skipped(no-op 防自证)' },
-		{ n: '攻击门', d: '开工前 3 角度审查;拦截→信箱→豁免重入;全 persona 无效回包 = unreviewed 同拦' },
-		{ n: '完成门四条件', d: '断言全过 + 回归零红 + 交付物实存 + 回滚预案落信箱;不过 = blocked + 信箱卡' },
-		{ n: '升级判定', d: '机械规则先行,LLM 只做裁量,宁可 note 不可乱 escalate' },
-		{ n: '失败诚实传播', d: '漏镜像 = 设计自定 P0;失败路径必落 pi_mirror_gap' }
+	const migrations = [
+		{ old: '攻击门 attack.py', now: '任务契约的审查声明 + 审查者 goal(角度=提示词);涉正本类必人卡=策略', where: '引擎→pi-goal(P2)' },
+		{ old: '波次 scheduler.py', now: '管理者用 subagent 自行展开执行图;内核只管预算/并发', where: 'pi-goal subagent(已上线)' },
+		{ old: '级联准入', now: '任务管理者裁量 + 人卡兜底', where: '提示词(P2)' },
+		{ old: '完成门四条件', now: 'verify 相:绿测+交付物(机械) + 判读(提示词)', where: 'pi-goal verify(已上线)' },
+		{ old: '红绿强制', now: 'execute 前置红测必须红(no-op 防自证)', where: 'pi-goal(已上线)' },
+		{ old: '监工裁决', now: '管理者提示词 + 交叉分析', where: '提示词(P2)' },
+		{ old: 'spawn 四原语(引擎)', now: '常驻 subagent(spawn/send/stop/status,重启安全)', where: 'pi-goal(已上线)' },
+		{ old: 'SidecarDuty 对话轮', now: '秘书成为 durable 常驻会话', where: 'P1 双轨(待切)' }
+	];
+
+	const guarantees = [
+		{ n: '防自证', d: '红测前置必须红 + verify 只认机械证据(文件/exit code),不认 Agent 自述——pi-goal execute/verify 相' },
+		{ n: '人的触点', d: 'card 相= durable 等待;approve/reject 经 HTTP/引擎信箱;goal 在等待期零代码运行' },
+		{ n: '失败诚实', d: '一切过单一原子提交线先存储后展示;崩溃 resume();requestId 幂等;终止路径全落 GoalIndex' },
+		{ n: '无界开销', d: '预算=轮数帽+墙钟(execute 相间检查);预算尽=failed 或人卡,绝不静默' }
 	];
 </script>
