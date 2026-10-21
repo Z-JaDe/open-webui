@@ -98,8 +98,8 @@
 				<g font-size="10" text-anchor="middle">
 					<text x="906" y="228" font-weight="600" class="fill-gray-900 dark:fill-gray-100">④ _stream_turn:订阅先行 → chat 后台跑</text>
 					<text x="906" y="246" class="fill-gray-600 dark:fill-gray-400">ConvHub.subscribe(conv) 先于一切(:297)</text>
-					<text x="906" y="262" class="fill-gray-600 dark:fill-gray-400">值班秘书 SidecarDuty(LRU tier:conv)</text>
-					<text x="906" y="278" class="fill-gray-600 dark:fill-gray-400">每轮 POST /run(历史拼进 task_text)</text>
+					<text x="906" y="262" class="fill-gray-600 dark:fill-gray-400">值班秘书 DutyOnGoal(LRU tier:conv)</text>
+					<text x="906" y="278" class="fill-gray-600 dark:fill-gray-400">每轮 POST /conv submit(记忆在 durable 会话)</text>
 					<text x="906" y="294" class="fill-gray-600 dark:fill-gray-400">pi ReAct → GLM 流式</text>
 				</g>
 				<!-- ⑤ 引擎内部 -->

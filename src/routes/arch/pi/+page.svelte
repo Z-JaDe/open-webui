@@ -284,9 +284,9 @@
 				<text x="189" y="39" text-anchor="middle" font-size="12" font-weight="600" class="fill-gray-800 dark:fill-gray-100">引擎调度面(谁在发起)</text>
 				<g font-size="10" text-anchor="middle">
 					<rect x="24" y="70" width="330" height="86" rx="8" class="fill-amber-50/60 dark:fill-gray-900 stroke-amber-400/70 dark:stroke-gray-600" stroke-width="1.5" />
-					<text x="189" y="92" font-size="11" font-weight="600" class="fill-gray-900 dark:fill-gray-100">SpawnAgentTool(runners/agent_tools.py)</text>
+					<text x="189" y="92" font-size="11" font-weight="600" class="fill-gray-900 dark:fill-gray-100">subagent 工具(pi-goal 原生 · 管理者/秘书直接调)</text>
 					<text x="189" y="110" class="fill-gray-600 dark:fill-gray-400">秘书/任务管理器的 LLM 工具</text>
-					<text x="189" y="126" class="fill-gray-600 dark:fill-gray-400">spawn_agent&#123;agent, task, pack&#125; · RF-35 恒异步</text>
+					<text x="189" y="126" class="fill-gray-600 dark:fill-gray-400">spawn&#123;name, role, message&#125; · role 经引擎 Roles 目录解析</text>
 					<text x="189" y="142" class="fill-gray-600 dark:fill-gray-400">_pending 登记 run_id → 会话</text>
 
 					<rect x="24" y="172" width="330" height="86" rx="8" class="fill-gray-50 dark:fill-gray-900 stroke-gray-300 dark:stroke-gray-700" />
@@ -296,7 +296,7 @@
 					<text x="189" y="244" class="fill-gray-600 dark:fill-gray-400">波内 TaskGroup,并发帽 4</text>
 
 					<rect x="24" y="274" width="330" height="86" rx="8" class="fill-gray-50 dark:fill-gray-900 stroke-gray-300 dark:stroke-gray-700" />
-					<text x="189" y="296" font-size="11" font-weight="600" class="fill-gray-800 dark:fill-gray-100">值班秘书 SidecarDuty(runners/agent.py)</text>
+					<text x="189" y="296" font-size="11" font-weight="600" class="fill-gray-800 dark:fill-gray-100">值班秘书 DutyOnGoal(runners/duty_goal.py)</text>
 					<text x="189" y="314" class="fill-gray-600 dark:fill-gray-400">对话面:每轮一发,wait=true</text>
 					<text x="189" y="330" class="fill-gray-600 dark:fill-gray-400">LRU tier:conv · 历史拼进 task_text</text>
 					<text x="189" y="346" class="fill-gray-600 dark:fill-gray-400">text_delta 回调 → ConvHub → WebUI</text>
@@ -339,11 +339,11 @@
 				<line x1="354" y1="92" x2="724" y2="92" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#p4-ar)" />
 				<text x="540" y="84" text-anchor="middle" font-size="10" font-weight="600" class="fill-gray-500 dark:fill-gray-400">① spawn_agent → 异步发起</text>
 				<line x1="354" y1="126" x2="724" y2="172" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#p4-ar)" />
-				<text x="540" y="146" text-anchor="middle" font-size="10" font-weight="600" class="fill-gray-500 dark:fill-gray-400">② agent_result 每 2s 轮询收割</text>
+				<text x="540" y="146" text-anchor="middle" font-size="10" font-weight="600" class="fill-gray-500 dark:fill-gray-400">② send 同名续话(steer 缺省/followUp 排队)</text>
 				<line x1="354" y1="140" x2="724" y2="252" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#p4-ar)" />
-				<text x="540" y="216" text-anchor="middle" font-size="10" font-weight="600" class="fill-gray-500 dark:fill-gray-400">③ agent_inject 运行中转向</text>
+				<text x="540" y="216" text-anchor="middle" font-size="10" font-weight="600" class="fill-gray-500 dark:fill-gray-400">③ stop / status 中止与查在手</text>
 				<line x1="354" y1="150" x2="724" y2="330" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#p4-ar)" />
-				<text x="540" y="284" text-anchor="middle" font-size="10" font-weight="600" class="fill-gray-500 dark:fill-gray-400">④ agent_wait:run_ids ≤ 8,all|any,超时可重入</text>
+				<text x="540" y="284" text-anchor="middle" font-size="10" font-weight="600" class="fill-gray-500 dark:fill-gray-400">④ 答案由 reporter 自动回流(零轮询 · durable)</text>
 				<line x1="354" y1="205" x2="724" y2="352" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#p4-ar)" />
 				<text x="540" y="356" text-anchor="middle" font-size="10" font-weight="600" class="fill-gray-500 dark:fill-gray-400">⑤ 波次工人:每任务一发,阻塞</text>
 				<line x1="354" y1="307" x2="724" y2="366" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#p4-ar)" />
@@ -353,7 +353,7 @@
 				<line x1="354" y1="430" x2="724" y2="440" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#p4-ar)" />
 				<text x="540" y="480" text-anchor="middle" font-size="10" font-weight="600" class="fill-gray-500 dark:fill-gray-400">⑧ 取消链:webui /work/&#123;id&#125;/cancel → 引擎 → abort</text>
 
-				<text x="540" y="520" text-anchor="middle" font-size="10.5" class="fill-gray-400 dark:fill-gray-500">「硬等待」不是 /run 的 wait 字段——spawn_agent 恒异步,硬等语义由 agent_result/agent_wait 轮询实现;每个 subagent = 独立 Pi 会话 + 独立 workspace jail</text>
+				<text x="540" y="520" text-anchor="middle" font-size="10.5" class="fill-gray-400 dark:fill-gray-500">v3:老 spawn 四件套已拆除——subagent 是常驻 durable 会话(崩溃续跑),子代理工具面=沙箱四件+一层封顶;秘书=pi-goal durable 会话(/conv 面),记忆在会话内</text>
 			</svg>
 		</div>
 
@@ -402,7 +402,7 @@
 		{ a: '/conv(全表面 v3)', b: '引擎 DutyOnGoal(runners/duty_goal.py)+GoalClient', c: '秘书=durable 会话:记忆在会话内,事件环逐 delta 流式' },
 		{ a: 'subagent 工具(pi-goal 原生)', b: '管理者/秘书直接调用(role=经引擎 Roles 目录)', c: '常驻子代理:spawn/send/stop/status,答案自动回流,崩溃安全——老 spawn 四件套已拆除' },
 		{ a: 'POST /sessions/:id/abort', b: '失败兜底(worker.py:359)+ 取消链', c: '客户端炸裂补一发防空转;webui /work/{id}/cancel 接这里' },
-		{ a: 'GET /sessions/:id/events', b: 'HttpWorker(worker.py:207-217)+ SidecarDuty/AgentRunner(agent.py:452-497)', c: '逐行镜像 K1 pi_event + 水位断档 pi_mirror_gap' },
+		{ a: 'GET /sessions/:id/events', b: 'HttpWorker(worker.py)+ /conv/:key/events(duty_goal.py 轮询)', c: '逐行镜像 K1 pi_event;水位/epoch 对账落 pi_mirror_gap' },
 		{ a: 'agent-tools 回调 POST', b: 'duty_tools + agent_tools 回调注册表', c: '信箱/任务/台账/知识/日历直读;失败=isError 不炸 run' },
 		{ a: '/sessions/:id/tree · fork · switch', b: 'PiSessions 卡(webui 只读)+ 引擎树投影', c: '会话树 DAG 展示;fork/switch 引擎侧预留' },
 		{ a: '/health', b: 'BanyanEngineStatus(webui 走 /banyan/api/health)', c: 'sidecar 健康红绿点' },

@@ -1,5 +1,11 @@
 # FORKING.md — banyan-webui fork 维护手册
 
+## banyan 侵入面补记(v3,2026-10-22)
+- `src/routes/(app)/workspace/+page.svelte`(改上游文件):D24 退役占位重建为 banyan 运行资产面——Agent 设计档案(数据源 `/banyan/api/agents/{name}` 引擎 md 正本)+工具聚合+档位+场景包。
+- `src/routes/arch/**` 新增目录(独立新文件):pi/banyan/webui 三架构子页,/arch 主页嵌入。
+- `src/lib/apis/banyan/index.ts`:新增 `getBanyanAgent`。
+
+
 本仓库是 Open WebUI 的 banyan 定制 fork（基线 **0.12.1**，分支 `banyan`）。
 上游：`open-webui/open-webui`；本 fork：`Z-JaDe/open-webui`。
 

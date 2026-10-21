@@ -39,7 +39,7 @@
 				banyan v3:goal 内核与统一机制(pi-durable)
 			</h1>
 			<span class="text-[11px] text-gray-400 dark:text-gray-500">
-				pi-goal :8101 · durable SQLite 执行正本 · 方案 v3 P1 已落地
+				pi-goal :8101 · durable SQLite 执行正本 · 直接切换已执行(触发器/波次迁移待接)
 			</span>
 		</div>
 
@@ -113,8 +113,8 @@
 				<g font-size="10.5" text-anchor="middle">
 					<!-- 触发层 -->
 					<rect x="14" y="24" width="200" height="88" rx="8" class="fill-blue-50 dark:fill-gray-900 stroke-blue-300 dark:stroke-gray-700" stroke-width="1.5" />
-					<text x="114" y="48" font-weight="600" class="fill-gray-900 dark:fill-gray-100">触发层(引擎持有)</text>
-					<text x="114" y="68" class="fill-gray-500 dark:fill-gray-400">cron(aut_items)· git watch(新)</text>
+					<text x="114" y="48" font-weight="600" class="fill-gray-900 dark:fill-gray-100">触发层(引擎持有 · P2 接线中)</text>
+					<text x="114" y="68" class="fill-gray-500 dark:fill-gray-400">现入口=手动 HTTP /goals;cron/git watch 待接</text>
 					<text x="114" y="84" class="fill-gray-500 dark:fill-gray-400">K1 事件订阅 · 手动</text>
 					<text x="114" y="100" class="fill-gray-500 dark:fill-gray-400">requestId 幂等 → 重启不重发</text>
 
@@ -150,7 +150,7 @@
 				<g font-size="10.5" text-anchor="middle">
 					<rect x="14" y="180" width="486" height="88" rx="8" class="fill-gray-50 dark:fill-gray-900 stroke-gray-300 dark:stroke-gray-700" />
 					<text x="257" y="204" font-weight="600" class="fill-gray-800 dark:fill-gray-100">场景一:每日交叉审查(cron 02:00)</text>
-					<text x="257" y="224" class="fill-gray-500 dark:fill-gray-400">goal(3×审查者并行 + 汇总)→ 异常报告</text>
+					<text x="257" y="224" class="fill-gray-500 dark:fill-gray-400">goal(3×审查者并行 + 汇总)→ 异常报告(目标形态:P2 接线后全自动)</text>
 					<text x="257" y="240" class="fill-gray-500 dark:fill-gray-400">→ 人卡或自动触发深审 goal → 结论提交执行 goal</text>
 					<text x="257" y="258" class="fill-gray-500 dark:fill-gray-400">全程同一套原语,无专属代码路径</text>
 
@@ -183,7 +183,7 @@
 					<!-- 引擎 -->
 					<rect x="272" y="24" width="240" height="150" rx="8" class="fill-amber-50/60 dark:fill-gray-900 stroke-amber-400/70 dark:stroke-gray-600" stroke-width="1.5" />
 					<text x="392" y="48" font-weight="600" class="fill-gray-900 dark:fill-gray-100">引擎(:8000,门卫+记账)</text>
-					<text x="392" y="70" class="fill-gray-500 dark:fill-gray-400">触发器:cron · git watch</text>
+					<text x="392" y="70" class="fill-gray-500 dark:fill-gray-400">触发器(P2 待接:手动 HTTP 已通)</text>
 					<text x="392" y="86" class="fill-gray-500 dark:fill-gray-400">·K1 事件订阅 · 手动</text>
 					<text x="392" y="106" class="fill-gray-500 dark:fill-gray-400">K1 事件账(事实与审计正本)</text>
 					<text x="392" y="122" class="fill-gray-500 dark:fill-gray-400">store 工具回调(信箱/日历</text>
@@ -208,7 +208,7 @@
 					<text x="967" y="106" class="fill-gray-500 dark:fill-gray-400">会话树 · 事件流(镜像 K1)</text>
 					<text x="967" y="130" font-weight="600" class="fill-gray-800 dark:fill-gray-100">GLM(zai-coding-cn)</text>
 					<text x="967" y="148" class="fill-gray-500 dark:fill-gray-400">glm-5.3 / glm-5.3-flash</text>
-					<text x="967" y="164" class="fill-gray-500 dark:fill-gray-400">流式 · token/cost 计量</text>
+					<text x="967" y="164" class="fill-gray-500 dark:fill-gray-400">流式 · token 计量(cost 价目未配)</text>
 				</g>
 				<!-- 接线箭头 -->
 				<line x1="214" y1="90" x2="270" y2="90" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#g3-ar)" />

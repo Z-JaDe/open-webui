@@ -190,9 +190,9 @@
 					<div>
 						<div class="font-medium text-gray-700 dark:text-gray-300 mb-1">对话流(秘书主导)</div>
 						<div class="font-mono text-[11px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 rounded p-2 overflow-x-auto">
-人 ─▶ WebUI ─▶ /run(秘书.md + 九件查询工具) ─▶ pi ReAct
+人 ─▶ WebUI ─▶ /conv submit(秘书.md durable 会话+回调工具∪subagent)
   ├─ 工具调用 ─▶ HTTP 回调 ─▶ 引擎 store 直读(信箱/任务/台账/日历)
-  ├─ spawn_agent ─▶ /run(探索者/审查者实例) ─▶ 结果回流
+  ├─ subagent(role=探索者/审查者) ─▶ 常驻子代理 ─▶ 答案自动回流
   └─ 回复 ──▶ pi_event 镜像 ─▶ SSE ─▶ WebUI 流式 ──▶ chat.db(K1 先行)
 						</div>
 					</div>
@@ -202,7 +202,7 @@
   ①seed(管理者会话=引擎 md 逐字)──▶ ②plan ──▶ ③execute(轮次+预算+红测前置;
   管理者自行 spawn 常驻子代理,答案 durable 回流;goal_report 收口)
   ──▶ ④card(人卡:等待即挂起,approve 续跑/reject 终止)──▶ ⑤verify(绿测+交付物,
-  只认机械证据)──▶ ⑥settle(终态落账)──▶ 完成卡 + K2 知识结算
+  只认机械证据)──▶ ⑥settle(终态落 GoalIndex;完成卡/K2 结算=P2 待接线)
 崩溃任意点 ──▶ durable 提交线续跑;预算尽/证据不过 ──▶ failed+卡,绝不静默</div>
 					</div>
 				</div>
