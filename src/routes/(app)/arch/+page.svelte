@@ -209,6 +209,55 @@
 				</div>
 			</div>
 
+			<!-- ═══ 架构子页入口 ═══ -->
+			<div class="mb-6">
+				<div class="text-sm font-medium text-black dark:text-white mb-2">架构子页(点开看全图)</div>
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<a
+						href="/arch/pi"
+						target="_blank"
+						rel="noreferrer"
+						class="group rounded-xl border border-gray-100 dark:border-gray-850 p-4 hover:border-gray-300 dark:hover:border-gray-700 transition"
+					>
+						<div class="flex items-center justify-between">
+							<div class="text-sm font-medium text-black dark:text-white">pi 执行内核</div>
+							<span class="text-xs text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300">/arch/pi ↗</span>
+						</div>
+						<p class="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
+							内核八项能力 · 与 banyan 引擎对接 · subagent 调度映射 · /run 生命周期 · 全触点总览——本页下方同款图板
+						</p>
+					</a>
+					<a
+						href="/arch/banyan"
+						target="_blank"
+						rel="noreferrer"
+						class="group rounded-xl border border-gray-100 dark:border-gray-850 p-4 hover:border-gray-300 dark:hover:border-gray-700 transition"
+					>
+						<div class="flex items-center justify-between">
+							<div class="text-sm font-medium text-black dark:text-white">banyan 编排与数据</div>
+							<span class="text-xs text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300">/arch/banyan ↗</span>
+						</div>
+						<p class="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
+							方案流状态机(人只出现两个触点)· 波次执行引擎(并发帽/失败语义)· 三种黑板与正本 · 机械闸门——全图示
+						</p>
+					</a>
+					<a
+						href="/arch/webui"
+						target="_blank"
+						rel="noreferrer"
+						class="group rounded-xl border border-gray-100 dark:border-gray-850 p-4 hover:border-gray-300 dark:hover:border-gray-700 transition md:col-span-2"
+					>
+						<div class="flex items-center justify-between">
+							<div class="text-sm font-medium text-black dark:text-white">WebUI × 引擎对接</div>
+							<span class="text-xs text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300">/arch/webui ↗</span>
+						</div>
+						<p class="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
+							一条消息的完整旅行(八步时序)· /banyan/api 代理面与鉴权链 · 零双写存储 · 组件触点——全图示
+						</p>
+					</a>
+				</div>
+			</div>
+
 			<!-- ═══ pi 执行内核(图示子页嵌入:/arch/pi)═══ -->
 			<div
 				class="rounded-xl border border-gray-100 dark:border-gray-850 p-4 mb-6"
@@ -233,38 +282,6 @@
 					style="height: {piHeight}px"
 					class="w-full rounded-lg border border-gray-100 dark:border-gray-850"
 				/>
-			</div>
-
-			<!-- ═══ 架构子页入口 ═══ -->
-			<div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-				<a
-					href="/arch/banyan"
-					target="_blank"
-					rel="noreferrer"
-					class="group rounded-xl border border-gray-100 dark:border-gray-850 p-4 hover:border-gray-300 dark:hover:border-gray-700 transition"
-				>
-					<div class="flex items-center justify-between">
-						<div class="text-sm font-medium text-black dark:text-white">banyan 编排与数据</div>
-						<span class="text-xs text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300">/arch/banyan ↗</span>
-					</div>
-					<p class="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
-						方案流状态机(人只出现两个触点)· 波次执行引擎(并发帽/失败语义)· 三种黑板与正本 · 机械闸门——全图示
-					</p>
-				</a>
-				<a
-					href="/arch/webui"
-					target="_blank"
-					rel="noreferrer"
-					class="group rounded-xl border border-gray-100 dark:border-gray-850 p-4 hover:border-gray-300 dark:hover:border-gray-700 transition"
-				>
-					<div class="flex items-center justify-between">
-						<div class="text-sm font-medium text-black dark:text-white">WebUI × 引擎对接</div>
-						<span class="text-xs text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300">/arch/webui ↗</span>
-					</div>
-					<p class="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
-						一条消息的完整旅行(八步时序)· /banyan/api 代理面与鉴权链 · 零双写存储 · 组件触点——全图示
-					</p>
-				</a>
 			</div>
 
 
