@@ -184,7 +184,7 @@
 				data-testid="banyan-arch-interactions"
 			>
 				<div class="text-sm font-medium text-black dark:text-white mb-3">
-					角色交互(Agent 之间永不直接对话,一切经三种黑板:K1 事件流 · 工作区文件 · 信箱/审卡)
+					角色交互(Agent 之间永不直接对话,一切经三种黑板:K1 事件流 · 工作区文件 · 人卡/信箱)
 				</div>
 				<div class="space-y-4">
 					<div>
@@ -196,15 +196,14 @@
   └─ 回复 ──▶ pi_event 镜像 ─▶ SSE ─▶ WebUI 流式 ──▶ chat.db(K1 先行)
 						</div>
 					</div>
-					<div>
-						<div class="font-medium text-gray-700 dark:text-gray-300 mb-1">方案流(任务管理器主导)</div>
-						<div class="font-mono text-[11px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 rounded p-2 overflow-x-auto">
-人/秘书 ─▶ 方案卡 ──▶ 级联准入(规则→单席→镜头→人)──▶ Ticket
-  ──▶ 探索(方案卡)──▶ 人批准 ──▶ 攻击门(3×审查者,拦截→信箱→豁免重入)
-  ──▶ 波次执行(执行者)──▶ 登记簿断言 ──▶ 完成门四条件
-  ──▶ finished + 信箱完成卡 + K2 知识结算
-  失败/模糊 ──▶ 任务管理器裁决 ──▶ 信箱卡 ──▶ 人处置 ──▶ 恢复
-						</div>
+<div>
+						<div class="font-medium text-gray-700 dark:text-gray-300 mb-1">机制流(goal 内核主导——一切机制的统一形态)</div>
+						<div class="font-mono text-[11px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 rounded p-2 overflow-x-auto">触发(cron/git watch/K1 订阅/手动)──▶ goal(requestId 幂等)
+  ①seed(管理者会话=引擎 md 逐字)──▶ ②plan ──▶ ③execute(轮次+预算+红测前置;
+  管理者自行 spawn 常驻子代理,答案 durable 回流;goal_report 收口)
+  ──▶ ④card(人卡:等待即挂起,approve 续跑/reject 终止)──▶ ⑤verify(绿测+交付物,
+  只认机械证据)──▶ ⑥settle(终态落账)──▶ 完成卡 + K2 知识结算
+崩溃任意点 ──▶ durable 提交线续跑;预算尽/证据不过 ──▶ failed+卡,绝不静默</div>
 					</div>
 				</div>
 			</div>

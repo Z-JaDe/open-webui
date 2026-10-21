@@ -1,7 +1,7 @@
 <script lang="ts">
 	// /arch/banyan(v3 重画):goal 内核架构——pi-durable 之上的薄编排。
 	// 事实出处:banyan/pi-goal 源码(goal.ts 六相/subagent.ts 常驻子代理/docs.ts 提交文档)
-	// + 方案-v3-薄banyan-on-pi-durable.md;v2 编排(波次/攻击门)仍在引擎,标记迁移态。
+	// + 方案-v3-薄banyan-on-pi-durable.md;只讲新架构本身,不做新旧对比。
 	import { onMount } from 'svelte';
 
 	onMount(() => {
@@ -163,31 +163,80 @@
 			</svg>
 		</div>
 
-		<!-- ═══ 图三:v2 → v3 对照 ═══ -->
+		<!-- ═══ 图三:全景分层架构 ═══ -->
 		<div class="rounded-xl border border-gray-100 dark:border-gray-850 p-3 mb-6">
 			<div class="text-sm font-medium text-black dark:text-white mb-2">
-				图三 · v2 → v3 对照——旧机制去哪了(现状:v2 编排仍在引擎并行运行,P3 拆除)
+				图三 · 全景分层架构——谁负责什么、怎么接线、正本归谁
 			</div>
-			<div class="overflow-x-auto">
-				<table class="w-full text-left text-[11px]">
-					<thead>
-						<tr class="text-gray-400 dark:text-gray-500">
-							<th class="py-1 pr-3 font-medium">v2 机制(代码)</th>
-							<th class="py-1 pr-3 font-medium">v3 表达</th>
-							<th class="py-1 font-medium">落地位置</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each migrations as m}
-							<tr class="border-t border-gray-100 dark:border-gray-850">
-								<td class="py-1 pr-3 text-gray-700 dark:text-gray-300 whitespace-nowrap">{m.old}</td>
-								<td class="py-1 pr-3 text-gray-500 dark:text-gray-400">{m.now}</td>
-								<td class="py-1 text-gray-500 dark:text-gray-400 whitespace-nowrap">{m.where}</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</div>
+			<svg viewBox="0 0 1080 430" class="w-full h-auto" role="img" aria-label="全景分层架构">
+				<g font-size="10.5" text-anchor="middle">
+					<!-- WebUI -->
+					<rect x="14" y="24" width="200" height="150" rx="8" class="fill-blue-50 dark:fill-gray-900 stroke-blue-300 dark:stroke-gray-700" stroke-width="1.5" />
+					<text x="114" y="48" font-weight="600" class="fill-gray-900 dark:fill-gray-100">WebUI(:8080)</text>
+					<text x="114" y="70" class="fill-gray-500 dark:fill-gray-400">身份认证(账号体系)</text>
+					<text x="114" y="86" class="fill-gray-500 dark:fill-gray-400">界面呈现(对话/信箱/日历</text>
+					<text x="114" y="102" class="fill-gray-500 dark:fill-gray-400">·工作空间/架构页)</text>
+					<text x="114" y="122" class="fill-gray-500 dark:fill-gray-400">/banyan/api 代理(登录门槛</text>
+					<text x="114" y="138" class="fill-gray-500 dark:fill-gray-400">+Bearer 注入)</text>
+					<text x="114" y="160" font-size="9.5" class="fill-gray-400 dark:fill-gray-500">正本:webui.db(仅身份与偏好,零消息)</text>
+
+					<!-- 引擎 -->
+					<rect x="272" y="24" width="240" height="150" rx="8" class="fill-amber-50/60 dark:fill-gray-900 stroke-amber-400/70 dark:stroke-gray-600" stroke-width="1.5" />
+					<text x="392" y="48" font-weight="600" class="fill-gray-900 dark:fill-gray-100">引擎(:8000,门卫+记账)</text>
+					<text x="392" y="70" class="fill-gray-500 dark:fill-gray-400">触发器:cron · git watch</text>
+					<text x="392" y="86" class="fill-gray-500 dark:fill-gray-400">·K1 事件订阅 · 手动</text>
+					<text x="392" y="106" class="fill-gray-500 dark:fill-gray-400">K1 事件账(事实与审计正本)</text>
+					<text x="392" y="122" class="fill-gray-500 dark:fill-gray-400">store 工具回调(信箱/日历</text>
+					<text x="392" y="138" class="fill-gray-500 dark:fill-gray-400">/台账/知识直读)·人卡处置面</text>
+					<text x="392" y="160" font-size="9.5" class="fill-gray-400 dark:fill-gray-500">正本:K1 events/ jsonl(唯一写者)</text>
+
+					<!-- pi-goal -->
+					<rect x="570" y="24" width="240" height="150" rx="8" class="fill-green-50 dark:fill-gray-900 stroke-green-400/60 dark:stroke-gray-700" stroke-width="1.5" />
+					<text x="690" y="48" font-weight="600" class="fill-gray-900 dark:fill-gray-100">pi-goal(:8101,goal 内核)</text>
+					<text x="690" y="70" class="fill-gray-500 dark:fill-gray-400">pi-durable Harness(提交线)</text>
+					<text x="690" y="86" class="fill-gray-500 dark:fill-gray-400">goal 六相任务 · 常驻 subagent</text>
+					<text x="690" y="102" class="fill-gray-500 dark:fill-gray-400">预算(轮数/墙钟) · 证据校验</text>
+					<text x="690" y="122" class="fill-gray-500 dark:fill-gray-400">人卡(watchDoc 等待)</text>
+					<text x="690" y="138" class="fill-gray-500 dark:fill-gray-400">HTTP:/goals · /cards · /usage</text>
+					<text x="690" y="160" font-size="9.5" class="fill-gray-400 dark:fill-gray-500">正本:session.sqlite(执行态,durable)</text>
+
+					<!-- pi-sidecar + GLM -->
+					<rect x="868" y="24" width="198" height="150" rx="8" class="fill-gray-50 dark:fill-gray-900 stroke-gray-300 dark:stroke-gray-700" />
+					<text x="967" y="48" font-weight="600" class="fill-gray-800 dark:fill-gray-100">pi-sidecar(:8100)</text>
+					<text x="967" y="70" class="fill-gray-500 dark:fill-gray-400">pi 执行内核(无角色 /run)</text>
+					<text x="967" y="86" class="fill-gray-500 dark:fill-gray-400">对话面(秘书 ReAct·沙箱)</text>
+					<text x="967" y="106" class="fill-gray-500 dark:fill-gray-400">会话树 · 事件流(镜像 K1)</text>
+					<text x="967" y="130" font-weight="600" class="fill-gray-800 dark:fill-gray-100">GLM(zai-coding-cn)</text>
+					<text x="967" y="148" class="fill-gray-500 dark:fill-gray-400">glm-5.3 / glm-5.3-flash</text>
+					<text x="967" y="164" class="fill-gray-500 dark:fill-gray-400">流式 · token/cost 计量</text>
+				</g>
+				<!-- 接线箭头 -->
+				<line x1="214" y1="90" x2="270" y2="90" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#g3-ar)" />
+				<text x="242" y="82" text-anchor="middle" font-size="9" class="fill-gray-400 dark:fill-gray-500">SSE/代理</text>
+				<line x1="512" y1="90" x2="568" y2="90" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#g3-ar)" />
+				<text x="540" y="82" text-anchor="middle" font-size="9" class="fill-gray-400 dark:fill-gray-500">BANYAN_GOAL_URL</text>
+				<line x1="392" y1="174" x2="392" y2="206" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#g3-ar)" />
+				<text x="400" y="196" font-size="9" class="fill-gray-400 dark:fill-gray-500">对话面 /v1/chat/completions</text>
+				<line x1="810" y1="174" x2="810" y2="206" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" />
+				<line x1="810" y1="206" x2="967" y2="206" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#g3-ar)" />
+				<text x="890" y="200" text-anchor="middle" font-size="9" class="fill-gray-400 dark:fill-gray-500">管理者/子代理 → GLM 流式</text>
+
+				<!-- 正本归属条 -->
+				<rect x="14" y="240" width="1052" height="46" rx="8" class="fill-gray-50 dark:fill-gray-900 stroke-gray-300 dark:stroke-gray-700" stroke-dasharray="4 3" />
+				<text x="540" y="258" text-anchor="middle" font-size="10.5" font-weight="600" class="fill-gray-700 dark:fill-gray-300">正本纪律:K1 事件账=事实与审计正本(引擎)· session.sqlite=执行态正本(pi-goal,断点续跑)· 知识仓(git)=知识正本 · webui.db=身份偏好</text>
+				<text x="540" y="276" text-anchor="middle" font-size="10" class="fill-gray-500 dark:fill-gray-400">职责铁律:内核不拥有事实与知识正本;角色定义权 100% 在引擎 agents/*.md(逐字下发);前端不执行工具</text>
+
+				<!-- 七原语 -->
+				<text x="540" y="322" text-anchor="middle" font-size="11" font-weight="600" class="fill-gray-700 dark:fill-gray-300">全系统只有七个原语——一切机制都是它们的组合:</text>
+				<g font-size="10" text-anchor="middle">
+					{#each primitives as prim, i}
+						<rect x="{14 + i * 152}" y="338" width="140" height="72" rx="8" class="fill-gray-50 dark:fill-gray-900 stroke-gray-200 dark:stroke-gray-800" />
+						<text x="{84 + i * 152}" y="360" font-weight="600" class="fill-gray-800 dark:fill-gray-100">{prim.n}</text>
+						<text x="{84 + i * 152}" y="378" class="fill-gray-500 dark:fill-gray-400">{prim.a}</text>
+						<text x="{84 + i * 152}" y="394" class="fill-gray-500 dark:fill-gray-400">{prim.b}</text>
+					{/each}
+				</g>
+			</svg>
 		</div>
 
 		<!-- ═══ 四机械保证 ═══ -->
@@ -209,15 +258,14 @@
 </div>
 
 <script context="module">
-	const migrations = [
-		{ old: '攻击门 attack.py', now: '任务契约的审查声明 + 审查者 goal(角度=提示词);涉正本类必人卡=策略', where: '引擎→pi-goal(P2)' },
-		{ old: '波次 scheduler.py', now: '管理者用 subagent 自行展开执行图;内核只管预算/并发', where: 'pi-goal subagent(已上线)' },
-		{ old: '级联准入', now: '任务管理者裁量 + 人卡兜底', where: '提示词(P2)' },
-		{ old: '完成门四条件', now: 'verify 相:绿测+交付物(机械) + 判读(提示词)', where: 'pi-goal verify(已上线)' },
-		{ old: '红绿强制', now: 'execute 前置红测必须红(no-op 防自证)', where: 'pi-goal(已上线)' },
-		{ old: '监工裁决', now: '管理者提示词 + 交叉分析', where: '提示词(P2)' },
-		{ old: 'spawn 四原语(引擎)', now: '常驻 subagent(spawn/send/stop/status,重启安全)', where: 'pi-goal(已上线)' },
-		{ old: 'SidecarDuty 对话轮', now: '秘书成为 durable 常驻会话', where: 'P1 双轨(待切)' }
+	const primitives = [
+		{ n: 'goal', a: '六相 durable 任务', b: '一切工作的载体' },
+		{ n: 'trigger', a: 'cron/git watch/K1 订阅', b: '唯一发起方式' },
+		{ n: 'agent', a: '管理者+常驻子代理', b: '提示词正本在引擎' },
+		{ n: 'task', a: 'durable 状态机', b: '子任务/锚/reporter' },
+		{ n: 'card', a: '人卡(等待即挂起)', b: '人的唯一触点' },
+		{ n: 'evidence', a: '红绿/交付物', b: '机械可验证据' },
+		{ n: 'ledger', a: 'K1 事件账', b: '事实与审计正本' }
 	];
 
 	const guarantees = [
