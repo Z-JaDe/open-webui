@@ -263,18 +263,8 @@
 				class="rounded-xl border border-gray-100 dark:border-gray-850 p-4 mb-6"
 				data-testid="banyan-arch-pi"
 			>
-				<div class="flex items-center justify-between mb-3">
-					<div class="text-sm font-medium text-black dark:text-white">
-						pi 执行内核——内核分层 · 引擎对接 · /run 生命周期(全图示)
-					</div>
-					<a
-						href="/arch/pi"
-						target="_blank"
-						rel="noreferrer"
-						class="text-xs px-2 py-1 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
-					>
-						新窗口看大图 ↗
-					</a>
+				<div class="text-sm font-medium text-black dark:text-white mb-3">
+					pi 执行内核——内核分层 · 引擎对接 · /run 生命周期(全图示)
 				</div>
 				<iframe
 					src="/arch/pi"
