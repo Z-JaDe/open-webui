@@ -399,10 +399,8 @@
 
 	const touchpoints = [
 		{ a: 'POST /run wait=true', b: '波次调度器 HttpWorker(scheduler:544 · engine.py:280)', c: '波次执行者工人,阻塞至 agent_settled' },
-		{ a: 'POST /run wait=false', b: 'SpawnAgentTool._call_async(agent_tools:315)', c: 'subagent 异步发起,立返 run_id,不经 HttpWorker' },
-		{ a: 'GET /runs/:run_id', b: 'SpawnAgentTool.result(agent_tools:341)', c: '每 2s 轮询收割;run registry ≤ 1000' },
-		{ a: 'POST /sessions/:id/inject', b: 'SpawnAgentTool.inject(agent_tools:452)', c: 'steer 打断转向 / followUp 本轮后接续(pi 原生)' },
-		{ a: 'agent_wait 批量等待', b: 'SpawnAgentTool.wait(agent_tools:393)', c: 'run_ids ≤ 8,all|any,超时返回 completed+pending 可重入' },
+		{ a: '/conv(全表面 v3)', b: '引擎 DutyOnGoal(runners/duty_goal.py)+GoalClient', c: '秘书=durable 会话:记忆在会话内,事件环逐 delta 流式' },
+		{ a: 'subagent 工具(pi-goal 原生)', b: '管理者/秘书直接调用(role=经引擎 Roles 目录)', c: '常驻子代理:spawn/send/stop/status,答案自动回流,崩溃安全——老 spawn 四件套已拆除' },
 		{ a: 'POST /sessions/:id/abort', b: '失败兜底(worker.py:359)+ 取消链', c: '客户端炸裂补一发防空转;webui /work/{id}/cancel 接这里' },
 		{ a: 'GET /sessions/:id/events', b: 'HttpWorker(worker.py:207-217)+ SidecarDuty/AgentRunner(agent.py:452-497)', c: '逐行镜像 K1 pi_event + 水位断档 pi_mirror_gap' },
 		{ a: 'agent-tools 回调 POST', b: 'duty_tools + agent_tools 回调注册表', c: '信箱/任务/台账/知识/日历直读;失败=isError 不炸 run' },
