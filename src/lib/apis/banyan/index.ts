@@ -5,6 +5,18 @@ import { WEBUI_BASE_URL } from '$lib/constants';
 
 export const BANYAN_API_BASE_URL = `${WEBUI_BASE_URL}/banyan/api`;
 
+export type BanyanAgentDesign = {
+	name: string;
+	description: string;
+	tier: string;
+	model: string;
+	tools: string[];
+	memory: string;
+	output: string;
+	runtime_prompts: string[];
+	prompt: string;
+};
+
 export type BanyanRegistryEntry = {
 	id: string;
 	/** 断言描述 */
@@ -788,6 +800,18 @@ export type BanyanEngineStatus = {
 		output?: string;
 	}[];
 	counts: { inbox: BanyanInboxUnread; plans_running: number };
+};
+
+export const getBanyanAgent = async (
+	name: string,
+	token: string = localStorage.token
+): Promise<BanyanAgentDesign> => {
+	const res = await fetch(`${BANYAN_API_BASE_URL}/agents/${encodeURIComponent(name)}`, {
+		method: 'GET',
+		headers: { Authorization: `Bearer ${token}` }
+	});
+	if (!res.ok) throw new Error(await res.text());
+	return res.json();
 };
 
 export const getBanyanStatus = async (token: string = localStorage.token): Promise<BanyanEngineStatus> => {
