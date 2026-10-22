@@ -185,9 +185,9 @@
 
 			<!-- ③ GLM -->
 			<rect x="772" y="252" width="268" height="34" rx="6" class="fill-green-50 dark:fill-gray-900 stroke-green-400/50 dark:stroke-gray-700" />
-			<text x="906" y="274" text-anchor="middle" font-size="10.5" class="fill-gray-700 dark:fill-gray-300">glm-5.3 — heavy 档(任务管理器)</text>
+			<text x="906" y="274" text-anchor="middle" font-size="10.5" class="fill-gray-700 dark:fill-gray-300">glm-5.3 — heavy 档(goal 高阶/verify)</text>
 			<rect x="772" y="294" width="268" height="34" rx="6" class="fill-green-50 dark:fill-gray-900 stroke-green-400/50 dark:stroke-gray-700" />
-			<text x="906" y="316" text-anchor="middle" font-size="10.5" class="fill-gray-700 dark:fill-gray-300">glm-5.3-flash — fast 档(其余角色)</text>
+			<text x="906" y="316" text-anchor="middle" font-size="10.5" class="fill-gray-700 dark:fill-gray-300">glm-5.3-flash — fast/daily 档(全部预设)</text>
 			<line x1="690" y1="288" x2="770" y2="288" class="stroke-gray-400 dark:stroke-gray-600" stroke-width="1.5" marker-end="url(#ar)" />
 			<text x="730" y="280" text-anchor="middle" font-size="10" font-weight="600" class="fill-gray-500 dark:fill-gray-400">③ 流式</text>
 			<rect x="756" y="360" width="300" height="60" rx="8" class="fill-transparent stroke-gray-300 dark:stroke-gray-700" stroke-dasharray="4 3" />
@@ -285,7 +285,7 @@
 				<g font-size="10" text-anchor="middle">
 					<rect x="24" y="70" width="330" height="86" rx="8" class="fill-amber-50/60 dark:fill-gray-900 stroke-amber-400/70 dark:stroke-gray-600" stroke-width="1.5" />
 					<text x="189" y="92" font-size="11" font-weight="600" class="fill-gray-900 dark:fill-gray-100">subagent 工具(pi-goal 原生 · 管理者/秘书直接调)</text>
-					<text x="189" y="110" class="fill-gray-600 dark:fill-gray-400">秘书/任务管理器的 LLM 工具</text>
+					<text x="189" y="110" class="fill-gray-600 dark:fill-gray-400">秘书(goal 管理者)的 LLM 工具</text>
 					<text x="189" y="126" class="fill-gray-600 dark:fill-gray-400">spawn&#123;name, role, message&#125; · role 经引擎 Roles 目录解析</text>
 					<text x="189" y="142" class="fill-gray-600 dark:fill-gray-400">_pending 登记 run_id → 会话</text>
 
