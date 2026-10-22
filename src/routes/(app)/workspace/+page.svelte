@@ -76,7 +76,7 @@
 				<h1 class="text-xl font-semibold text-gray-900 dark:text-white">工作空间</h1>
 			</div>
 			<p class="text-xs text-gray-400 dark:text-gray-500 mb-6">
-				以 Agent 维度组织——每个 Agent 一份设计档案;正本是引擎 <span class="font-mono">agents/*.md</span>(七要素 + 提示词全文),此处只读零拷贝。
+				预设库——以 Agent 维度组织的启动配置(提示词底座+工具面+档位);正本是引擎 <span class="font-mono">agents/*.md</span>,此处只读零拷贝。spawn 时按名引用,goal 验收单的 reviewer 裁判也用这里的审查者底座。
 			</p>
 
 			{#if error}
