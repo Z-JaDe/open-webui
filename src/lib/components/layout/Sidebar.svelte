@@ -147,6 +147,7 @@
 		{ id: 'waves', label: '方案', href: '/waves', prefix: '/waves' },
 		{ id: 'tree', label: '会话树', href: '/tree', prefix: '/tree' },
 		{ id: 'arch', label: '架构', href: '/arch', prefix: '/arch' },
+		{ id: 'goals', label: 'Goal 会话', href: '/goals', prefix: '/goals' },
 		{ id: 'inbox', label: '信箱', href: '/inbox', prefix: '/inbox' },
 		{ id: 'cal', label: '日历', href: '/cal', prefix: '/cal' }
 	];

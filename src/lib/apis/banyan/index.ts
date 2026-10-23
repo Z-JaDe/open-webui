@@ -814,6 +814,48 @@ export const getBanyanAgent = async (
 	return res.json();
 };
 
+export type BanyanGoalEntry = {
+	goalId: string;
+	requestId: string | null;
+	kind: string;
+	objective: string;
+	phase: string;
+	status: 'running' | 'completed' | 'failed' | 'aborted';
+	createdAt: number;
+	settledAt: number | null;
+	summary: string | null;
+	error: string | null;
+};
+
+export type BanyanGoalConvs = {
+	manager: { name: string; conversationId: string; transcript: Array<{ role: string; text: string }> };
+	subagents: Array<{ name: string; conversationId: string; transcript: Array<{ role: string; text: string }> }>;
+	reviewers: Array<{ name: string; conversationId: string; transcript: Array<{ role: string; text: string }> }>;
+};
+
+export const getBanyanGoals = async (
+	token: string = localStorage.token
+): Promise<BanyanGoalEntry[]> => {
+	const res = await fetch(`${BANYAN_API_BASE_URL}/goals`, {
+		method: 'GET',
+		headers: { Authorization: `Bearer ${token}` }
+	});
+	if (!res.ok) throw new Error(await res.text());
+	return (await res.json()).goals ?? [];
+};
+
+export const getBanyanGoalConvs = async (
+	goalId: string,
+	token: string = localStorage.token
+): Promise<BanyanGoalConvs> => {
+	const res = await fetch(`${BANYAN_API_BASE_URL}/goals/${encodeURIComponent(goalId)}/convs`, {
+		method: 'GET',
+		headers: { Authorization: `Bearer ${token}` }
+	});
+	if (!res.ok) throw new Error(await res.text());
+	return res.json();
+};
+
 export const getBanyanStatus = async (token: string = localStorage.token): Promise<BanyanEngineStatus> => {
 	const res = await fetch(`${BANYAN_API_BASE_URL}/status`, {
 		method: 'GET',
