@@ -41,7 +41,7 @@
 			pi 执行内核:架构与对接
 		</h1>
 		<span class="text-[11px] text-gray-400 dark:text-gray-500">
-			@earendil-works/pi-coding-agent · pin 1.2.0
+			@earendil-works/pi-coding-agent · pin 1.4.0
 		</span>
 	</div>
 
@@ -133,7 +133,7 @@
 			<rect x="562" y="478" width="494" height="42" rx="8" class="fill-transparent stroke-gray-300 dark:stroke-gray-700" stroke-dasharray="4 3" />
 			<text x="809" y="504" text-anchor="middle" font-size="11" class="fill-gray-500 dark:fill-gray-400">资源发现(技能/模板/主题)——banyan 运行时全部关闭</text>
 
-			<text x="540" y="556" text-anchor="middle" font-size="10.5" class="fill-gray-400 dark:fill-gray-500">锁版:pi-coding-agent pin 1.2.0(含 pi-ai 1.2.0)· in-process SDK(不走 RPC 子进程)· node:http 零框架</text>
+			<text x="540" y="556" text-anchor="middle" font-size="10.5" class="fill-gray-400 dark:fill-gray-500">锁版:pi-coding-agent pin 1.4.0(含 pi-ai 1.2.0)· in-process SDK(不走 RPC 子进程)· node:http 零框架</text>
 		</svg>
 	</div>
 

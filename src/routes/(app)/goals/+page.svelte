@@ -75,10 +75,13 @@
 					? convs.subagents[Number(tab.slice(4))]?.transcript ?? []
 					: convs.reviewers[Number(tab.slice(4))]?.transcript ?? [];
 
-	onMount(async () => {
-		await refresh();
-		loaded = true;
-		const timer = setInterval(refresh, 8000);
+	onMount(() => {
+		let timer: ReturnType<typeof setInterval>;
+		void (async () => {
+			await refresh();
+			loaded = true;
+			timer = setInterval(refresh, 8000);
+		})();
 		return () => clearInterval(timer);
 	});
 </script>

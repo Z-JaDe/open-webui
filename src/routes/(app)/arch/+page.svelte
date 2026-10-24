@@ -126,7 +126,7 @@
 				data-testid="banyan-arch-agents"
 			>
 				<div class="text-sm font-medium text-black dark:text-white mb-1">
-					Agent 全景(5 个)
+					Agent 全景({agents.length} 预设)
 				</div>
 				<p class="text-gray-400 dark:text-gray-500 text-xs mb-3">
 					每个 Agent 一份 md(frontmatter:名称/描述/档位/工具/记忆/输出),提示词正本在
@@ -202,7 +202,7 @@
   ①seed(管理者会话=引擎 md 逐字)──▶ ②plan ──▶ ③execute(轮次+预算+红测前置;
   管理者自行 spawn 常驻子代理,答案 durable 回流;goal_report 收口)
   ──▶ ④card(人卡:等待即挂起,approve 续跑/reject 终止)──▶ ⑤verify(绿测+交付物,
-  只认机械证据)──▶ ⑥settle(终态落 GoalIndex;完成卡/K2 结算=P2 待接线)
+  机器+审查者+变异门三裁判)──▶ ⑥settle(终态落 GoalIndex;完成卡/K2 结算=P2 待接线)
 崩溃任意点 ──▶ durable 提交线续跑;预算尽/证据不过 ──▶ failed+卡,绝不静默</div>
 					</div>
 				</div>
@@ -273,8 +273,6 @@
 				/>
 			</div>
 
-
-			<!-- ═══ 存储架构 ═══ -->
 
 			<!-- ═══ 存储架构 ═══ -->
 			<div
