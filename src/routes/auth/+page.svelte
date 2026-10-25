@@ -231,17 +231,17 @@
 		}
 	});
 
-	// Desktop App OAuth Bridge:登录成功后把 JWT 存到 bridge 端点
-	$: if ($page?.url?.searchParams?.get('bridge')) {
-		const bridgeId = $page.url.searchParams.get('bridge');
-		const token = localStorage.getItem('token');
-		if (token && bridgeId) {
-			fetch(`/api/v1/auths/bridge/${bridgeId}/deposit`, {
-				method: 'POST',
-				headers: { Authorization: `Bearer ${token}` }
-			}).then(() => {
-				console.log('Bridge token deposited for', bridgeId);
-			});
+
+	// Desktop App Bridge:把 URL 里的 bridge_id 存到 localStorage,全局 layout 会处理
+	// 如果来自桌面 App(有 bridge 参数),自动触发 GitHub OAuth
+	$: {
+		const bid = $page?.url?.searchParams?.get('bridge');
+		if (bid) {
+			localStorage.setItem('banyan_bridge_id', bid);
+			// 自动点 GitHub 登录(用户不用手动点)
+			setTimeout(() => {
+				window.location.href = '/oauth/github/login';
+			}, 100);
 		}
 	}
 </script>

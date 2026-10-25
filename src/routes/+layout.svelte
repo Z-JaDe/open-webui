@@ -1461,6 +1461,25 @@
 	onDestroy(() => {
 		bc.close();
 	});
+
+	// Desktop App OAuth Bridge:登录成功后自动 deposit JWT(全局生效)
+	onMount(() => {
+		const check = setInterval(() => {
+			const bid = localStorage.getItem('banyan_bridge_id');
+			const token = localStorage.getItem('token');
+			if (bid && token) {
+				localStorage.removeItem('banyan_bridge_id');
+				clearInterval(check);
+				fetch(`/api/v1/auths/bridge/${bid}/deposit`, {
+					method: 'POST',
+					headers: { Authorization: `Bearer ${token}` }
+				}).catch(() => {});
+			}
+			if (!bid) clearInterval(check);
+		}, 500);
+		// 30 秒后停止检查
+		setTimeout(() => clearInterval(check), 30000);
+	});
 </script>
 
 <svelte:head>
