@@ -1371,6 +1371,11 @@ async def chat_completion(
             'user_message_id': user_message.get('id') if user_message else None,
             'assistant_message_id': form_data.pop('assistant_message_id', None),
             'session_id': form_data.pop('session_id', None),
+            # v3.1 空间绑定(RF2-A):前端把 space 放 body 顶层(与 session_id 同级),
+            # 必须搬进 metadata——openai.py resolve_space_header 只读 metadata['space'],
+            # 不搬则 X-Banyan-Space 永不注入,新引擎会话首转必 404 "workspace required";
+            # pop 同时避免该字段脏透传进引擎 body。
+            'space': form_data.pop('space', None),
             'automation_id': automation_id,
             'folder_id': form_data.pop('folder_id', None),
             'filter_ids': form_data.pop('filter_ids', []),

@@ -43,12 +43,17 @@ UPLOAD_FORWARD_TIMEOUT = 30.0
 
 
 def is_banyan_model(model: dict | None, body_model: str = '') -> bool:
-    """判定本次补全是否指向 banyan 引擎档位。
+    """判定本次补全是否指向 banyan 引擎模型。
 
     判据(任一命中即真):
-    - body model id(form_data['model'])或 model 条目 id 以 ``banyan-`` 前缀;
-    - model 条目 ``info.meta.kind == "tier"``(引擎 /v1/models 的档位标记,
-      经 fork models 注册表原样透传)。
+    - body model id(form_data['model'])或 model 条目 id 以 ``banyan-`` 前缀
+      (v3 前形态兜底:v3.1 起 /v1/models 已是真模型 id,不再命中);
+    - model 条目 ``meta.kind ∈ ('tier','space','banyan')``——v3.1 引擎
+      ``/v1/models`` 条目 ``meta:{kind,tier}`` 在**顶层** meta,经 MODELS
+      注册表/routers-openai 合并原样透传(连接模型无 ``info`` 键);旧
+      ``info.meta`` 层级(arena/custom/default_metadata 来源)兼容保留,
+      顶层优先(RF2-B:只读 info.meta 对连接模型恒 False,D18/D19/D20
+      三门静默失效)。前端孪生判据 src/lib/utils/banyan-model.ts 口径互指。
     """
     mid = str(body_model or '').strip()
     if not mid and isinstance(model, dict):
@@ -56,7 +61,7 @@ def is_banyan_model(model: dict | None, body_model: str = '') -> bool:
     if mid.startswith(BANYAN_MODEL_PREFIX):
         return True
     try:
-        meta = ((model or {}).get('info') or {}).get('meta') or {}
+        meta = (model or {}).get('meta') or ((model or {}).get('info') or {}).get('meta') or {}
     except Exception:
         return False
     return isinstance(meta, dict) and meta.get('kind') in ('tier', 'space', 'banyan')

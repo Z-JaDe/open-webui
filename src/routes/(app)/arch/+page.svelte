@@ -25,38 +25,49 @@
 		}
 	};
 
-	onMount(async () => {
-		try {
-			const status = await getBanyanStatus();
-			home = status.engine.home ?? '';
-			agents = status.agents ?? [];
-		} catch {
-			home = '';
-		}
-		loaded = true;
-		// 高度自适应兜底:同源直读子页内容高度——子页 postMessage 可能早于本页监听器挂载而丢失
-		let tries = 0;
-		const fit = setInterval(() => {
-			tries++;
-			const f = document.querySelector('iframe[src="/arch/pi"]');
-			if (!f) {
-				if (tries > 60) clearInterval(fit);
-				return;
-			}
+	// RF2-D 类级修复(同 goals 页竞态形态):原 onMount(async) 返回 Promise,
+	// 其 return 的 cleanup 从未被注册——destroy 早于 interval 建立时泄漏
+	// (interval 自限 60 次故有界,但窗口存在)。改 dead 标志 + 真 cleanup。
+	onMount(() => {
+		let dead = false;
+		let fit: ReturnType<typeof setInterval> | undefined;
+		void (async () => {
 			try {
-				const inner = f.contentDocument && f.contentDocument.querySelector('.max-w-full');
-				if (inner) {
-					const h = Math.ceil(inner.getBoundingClientRect().height) + 2;
-					if (h > 400) piHeight = Math.min(h, 4000);
-					clearInterval(fit);
-				} else if (tries > 60) {
-					clearInterval(fit);
-				}
+				const status = await getBanyanStatus();
+				home = status.engine.home ?? '';
+				agents = status.agents ?? [];
 			} catch {
-				if (tries > 60) clearInterval(fit);
+				home = '';
 			}
-		}, 500);
-		return () => clearInterval(fit);
+			loaded = true;
+			if (dead) return;
+			// 高度自适应兜底:同源直读子页内容高度——子页 postMessage 可能早于本页监听器挂载而丢失
+			let tries = 0;
+			fit = setInterval(() => {
+				tries++;
+				const f = document.querySelector('iframe[src="/arch/pi"]');
+				if (!f) {
+					if (tries > 60) clearInterval(fit);
+					return;
+				}
+				try {
+					const inner = f.contentDocument && f.contentDocument.querySelector('.max-w-full');
+					if (inner) {
+						const h = Math.ceil(inner.getBoundingClientRect().height) + 2;
+						if (h > 400) piHeight = Math.min(h, 4000);
+						clearInterval(fit);
+					} else if (tries > 60) {
+						clearInterval(fit);
+					}
+				} catch {
+					if (tries > 60) clearInterval(fit);
+				}
+			}, 500);
+		})();
+		return () => {
+			dead = true;
+			clearInterval(fit);
+		};
 	});
 
 	const memoryLabel = (m?: string) =>

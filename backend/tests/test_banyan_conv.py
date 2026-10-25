@@ -180,3 +180,41 @@ def test_missing_chat_row_returns_none(monkeypatch):
     _install_fake_chats(monkeypatch, _FakeChats())
     out = asyncio.run(bc.resolve_conv_header({'chat_id': 'ghost'}, ENGINE_V1))
     assert out is None
+
+
+# ── resolve_space_header(v3.1 空间绑定头,RF2-A)──
+
+
+def test_space_header_resolves_when_metadata_has_space(monkeypatch):
+    """metadata 带 space → 返回 id(openai.py 据此注入 X-Banyan-Space)。"""
+    monkeypatch.setenv('BANYAN_ENGINE_URL', ENGINE)
+    assert bc.resolve_space_header({'space': 'ws-1'}, ENGINE_V1) == 'ws-1'
+
+
+def test_space_header_none_for_missing_or_falsy_space(monkeypatch):
+    monkeypatch.setenv('BANYAN_ENGINE_URL', ENGINE)
+    assert bc.resolve_space_header({}, ENGINE_V1) is None
+    assert bc.resolve_space_header({'space': None}, ENGINE_V1) is None
+    assert bc.resolve_space_header({'space': ''}, ENGINE_V1) is None
+    assert bc.resolve_space_header(None, ENGINE_V1) is None
+
+
+def test_space_header_skips_task_rounds_and_non_engine_target(monkeypatch):
+    """task 轮(title/tags 等后台单发)不注空间头——防任务轮建绑定;
+    非引擎目标不注。"""
+    monkeypatch.setenv('BANYAN_ENGINE_URL', ENGINE)
+    assert bc.resolve_space_header({'space': 'ws-1', 'task': 'title_generation'}, ENGINE_V1) is None
+    assert bc.resolve_space_header({'space': 'ws-1'}, 'http://api.openai.com/v1') is None
+
+
+def test_main_chat_completion_pops_space_into_metadata():
+    """RF2-A 红测(源码钉线,与 test_banyan_attach 的 middleware 钉线同款):
+    前端把 space 放在请求 body 顶层(Chat.svelte,与 session_id 同级),
+    main.py chat_completion 服务端重建 metadata 的 pop 白名单必须搬运 space——
+    不搬则 resolve_space_header 读 metadata.get('space') 恒 None,X-Banyan-Space
+    永不注入,经 WebUI 的每个新引擎会话首转必 404"workspace required"。
+    chat_completion 为内联端点逻辑不可单测,此处钉源码行;真实请求链路交 FA 阶段。"""
+    src = (
+        pathlib.Path(__file__).resolve().parents[1] / 'open_webui' / 'main.py'
+    ).read_text(encoding='utf-8')
+    assert "'space': form_data.pop('space', None)," in src

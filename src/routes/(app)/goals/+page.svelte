@@ -117,13 +117,20 @@
 					: ((convs.reviewers[Number(tab.slice(4))]?.transcript ?? []) as TMsg[]);
 
 	onMount(() => {
-		let timer: ReturnType<typeof setInterval>;
+		let timer: ReturnType<typeof setInterval> | undefined;
+		// RF2-D 竞态防护:组件在 await refresh() 完成前被销毁时,cleanup 跑在
+		// setInterval 赋值之前(clearInterval 捕获 undefined 无操作),IIFE 随后
+		// 仍会 setInterval → 已销毁组件每 8s 轮询永不回收。dead 标志封死该窗口。
+		let dead = false;
 		void (async () => {
 			await refresh();
 			loaded = true;
-			timer = setInterval(refresh, 8000);
+			if (!dead) timer = setInterval(refresh, 8000);
 		})();
-		return () => clearInterval(timer);
+		return () => {
+			dead = true;
+			clearInterval(timer);
+		};
 	});
 </script>
 

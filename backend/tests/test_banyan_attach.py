@@ -57,6 +57,40 @@ def test_is_banyan_model_by_meta_kind_tier():
     assert not ba.is_banyan_model(None, 'gpt-4o')
 
 
+def test_is_banyan_model_connected_catalog_top_level_meta():
+    """RF2-B 红测:v3.1 引擎 /v1/models 条目(kind 在**顶层** meta,无 info 键)
+    经 routers/openai.py merged={**model,...} 与 MODELS 注册表透传——中间件
+    拿到的 model 条目顶层带 meta。修复前只读 info.meta → 对连接模型恒 False,
+    D18 附件携带 / D19 RAG 短路 / D20 记忆封禁三门全部静默失效。"""
+    # 连接形态(v3.1 真模型 id,kind=banyan):
+    assert ba.is_banyan_model(
+        {'id': 'glm-5.3-flash', 'meta': {'kind': 'banyan', 'tier': 'fast'}})
+    assert ba.is_banyan_model(
+        {'id': 'glm-5.3', 'meta': {'kind': 'banyan', 'tier': 'heavy'}})
+    # 顶层 meta 兼容旧 kind 值:
+    assert ba.is_banyan_model({'id': 'x', 'meta': {'kind': 'tier'}})
+    assert ba.is_banyan_model({'id': 'x', 'meta': {'kind': 'space'}})
+    # 非 banyan 条目(同样顶层透传):
+    assert not ba.is_banyan_model({'id': 'gpt-4o', 'meta': {'kind': 'openai'}})
+    assert not ba.is_banyan_model({'id': 'gpt-4o', 'meta': {}})
+    assert not ba.is_banyan_model({'id': 'gpt-4o'})
+
+
+def test_is_banyan_model_top_level_meta_takes_priority():
+    """顶层优先:两处都给时 info.meta 不得遮蔽顶层(连接模型 info 只在
+    arena/custom/default_metadata 三种来源才有,正常连接模型无 info 键)。"""
+    assert ba.is_banyan_model(
+        {'id': 'x', 'meta': {'kind': 'banyan'}, 'info': {'meta': {'kind': 'openai'}}})
+    # 无顶层 meta 时回落旧 info.meta 形态(自定义/arena 模型挂 banyan 标记):
+    assert ba.is_banyan_model({'id': 'x', 'info': {'meta': {'kind': 'banyan'}}})
+
+
+def test_is_banyan_model_prefix_fallback_still_true():
+    """banyan- 前缀兜底仍真(v3 前形态兼容;v3.1 id=真模型名已不命中)。"""
+    assert ba.is_banyan_model({'id': 'banyan-duty', 'meta': {}})
+    assert ba.is_banyan_model({'id': 'anything'}, 'banyan-fast')
+
+
 # ── strip_multimodal_segments:多模态剥离(D18 防 token 爆炸)──
 
 B64 = 'data:image/png;base64,iVBORw0KGgoAAAANSU' + 'A' * 200

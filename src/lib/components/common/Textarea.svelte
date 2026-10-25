@@ -18,19 +18,31 @@
 	let textareaElement: HTMLTextAreaElement | null = null;
 
 	// Adjust height on mount and after setting the element.
-	onMount(async () => {
-		await tick();
-		resize();
+	// RF2-D 类级修复(同 goals 页竞态形态):onMount(async) 返回 Promise,
+	// Svelte 不注册其 return 的 cleanup——destroy 发生在 await tick()/rAF
+	// 之后、textareaElement 绑定之前时,轮询 interval 每 100ms 永不回收。
+	// dead 标志 + 真 cleanup 封死该窗口。
+	onMount(() => {
+		let dead = false;
+		void (async () => {
+			await tick();
+			if (dead) return;
+			resize();
 
-		requestAnimationFrame(() => {
-			// setInterveal to cehck until textareaElement is set
-			const interval = setInterval(() => {
-				if (textareaElement) {
-					clearInterval(interval);
-					resize();
-				}
-			}, 100);
-		});
+			requestAnimationFrame(() => {
+				if (dead) return;
+				// setInterveal to cehck until textareaElement is set
+				const interval = setInterval(() => {
+					if (textareaElement) {
+						clearInterval(interval);
+						resize();
+					}
+				}, 100);
+			});
+		})();
+		return () => {
+			dead = true;
+		};
 	});
 
 	const resize = () => {
