@@ -913,6 +913,20 @@ export type BanyanWorkspace = {
 	error: string;
 	agent_prompt?: string;
 	staging_config?: Record<string, string>;
+	skills_detail?: Array<{ name: string; body: string }>;
+	roles_detail?: Array<{
+		name: string;
+		description: string;
+		tier: string;
+		tools: string[];
+		memory: string;
+		prompt: string;
+	}>;
+	knowledge_detail?: Array<{
+		scope: string;
+		total: number;
+		items: Array<{ title: string; file: string }>;
+	}>;
 };
 
 export const getBanyanWorkspaces = async (

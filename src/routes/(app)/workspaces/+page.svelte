@@ -12,6 +12,9 @@
 	let selected = '';
 	let detail: BanyanWorkspace | null = null;
 	let tab = 'agent';
+	let selSkill = '';
+	let selRole = '';
+	let selScope = '';
 
 	async function refresh() {
 		try {
@@ -24,6 +27,9 @@
 	async function select(id: string) {
 		selected = id;
 		tab = 'agent';
+		selSkill = '';
+		selRole = '';
+		selScope = '';
 		const cached = spaces.find((s) => s.id === id);
 		if (cached?.agent_prompt) {
 			detail = cached;
@@ -147,21 +153,57 @@
 									{/each}
 								</div>
 							{:else if tab === 'skills'}
-								<div class="flex flex-wrap gap-2">
-									{#each detail.skills as sk (sk)}
-										<span class="text-xs px-2 py-1 rounded-lg bg-gray-100 dark:bg-gray-850 text-gray-700 dark:text-gray-200 font-mono">{sk}</span>
-									{:else}
-										<span class="text-xs text-gray-400">无技能</span>
-									{/each}
-								</div>
+								{#if detail.skills.length === 0}
+									<span class="text-xs text-gray-400">无技能</span>
+								{:else}
+									<div class="flex flex-wrap gap-2 mb-3">
+										{#each detail.skills as sk (sk)}
+											<button
+												class="text-xs px-2 py-1 rounded-lg font-mono transition {selSkill === sk
+													? 'bg-gray-900 text-white dark:bg-white dark:text-black'
+													: 'bg-gray-100 dark:bg-gray-850 text-gray-700 dark:text-gray-200'}"
+												on:click={() => (selSkill = selSkill === sk ? '' : sk)}
+											>
+												{sk}
+											</button>
+										{/each}
+									</div>
+									{#if selSkill}
+										{@const body = detail.skills_detail?.find((x) => x.name === selSkill)?.body ?? ''}
+										<pre class="text-xs leading-relaxed whitespace-pre-wrap text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 max-h-96 overflow-y-auto">{body}</pre>
+									{/if}
+								{/if}
 							{:else if tab === 'knowledge'}
-								<div class="flex flex-wrap gap-2">
-									{#each detail.knowledge_scopes as k (k)}
-										<span class="text-xs px-2 py-1 rounded-lg bg-gray-100 dark:bg-gray-850 text-gray-700 dark:text-gray-200">{k}</span>
-									{:else}
-										<span class="text-xs text-gray-400">未挂知识域</span>
-									{/each}
-								</div>
+								{#if detail.knowledge_scopes.length === 0}
+									<span class="text-xs text-gray-400">未挂知识域</span>
+								{:else}
+									<div class="flex flex-wrap gap-2 mb-3">
+										{#each detail.knowledge_scopes as k (k)}
+											<button
+												class="text-xs px-2 py-1 rounded-lg transition {selScope === k
+													? 'bg-gray-900 text-white dark:bg-white dark:text-black'
+													: 'bg-gray-100 dark:bg-gray-850 text-gray-700 dark:text-gray-200'}"
+												on:click={() => (selScope = selScope === k ? '' : k)}
+											>
+												{k}
+											</button>
+										{/each}
+									</div>
+									{#if selScope}
+										{@const kd = detail.knowledge_detail?.find((x) => x.scope === selScope)}
+										<div class="text-[11px] text-gray-400 mb-1">{selScope} · 共 {kd?.total ?? 0} 条</div>
+										<div class="space-y-1 max-h-72 overflow-y-auto">
+											{#each kd?.items ?? [] as it (it.file)}
+												<div class="flex items-center gap-2 text-xs bg-gray-50 dark:bg-gray-900/50 rounded px-2 py-1.5">
+													<span class="text-gray-800 dark:text-gray-100 truncate">{it.title}</span>
+													<span class="ml-auto text-[10px] text-gray-400 font-mono truncate">{it.file}</span>
+												</div>
+											{:else}
+												<div class="text-xs text-gray-400">该域暂无条目</div>
+											{/each}
+										</div>
+									{/if}
+								{/if}
 							{:else if tab === 'tools'}
 								<div class="text-[11px] text-gray-400 mb-1">工具白名单</div>
 								<div class="flex flex-wrap gap-1 mb-3">
@@ -169,12 +211,28 @@
 										<span class="text-[11px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-850 font-mono">{t}</span>
 									{/each}
 								</div>
-								<div class="text-[11px] text-gray-400 mb-1">可派 subagent 角色</div>
-								<div class="flex flex-wrap gap-1">
+								<div class="text-[11px] text-gray-400 mb-1">可派 subagent 角色(点击看正文)</div>
+								<div class="flex flex-wrap gap-1 mb-3">
 									{#each detail.roles as r (r)}
-										<span class="text-[11px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-850">{r}</span>
+										<button
+											class="text-[11px] px-1.5 py-0.5 rounded transition {selRole === r
+												? 'bg-gray-900 text-white dark:bg-white dark:text-black'
+												: 'bg-gray-100 dark:bg-gray-850'}"
+											on:click={() => (selRole = selRole === r ? '' : r)}
+										>
+											{r}
+										</button>
 									{/each}
 								</div>
+								{#if selRole}
+									{@const rd = detail.roles_detail?.find((x) => x.name === selRole)}
+									{#if rd}
+										<div class="text-[11px] text-gray-400 mb-1">
+											{rd.description} · tier={rd.tier} · memory={rd.memory} · 工具:{rd.tools.join(', ') || '无'}
+										</div>
+										<pre class="text-xs leading-relaxed whitespace-pre-wrap text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 max-h-72 overflow-y-auto">{rd.prompt}</pre>
+									{/if}
+								{/if}
 							{:else if tab === 'staging'}
 								{#if detail.staging}
 									<div class="text-xs text-gray-500 dark:text-gray-400 space-y-1">
