@@ -230,6 +230,20 @@
 			onboarding = $config?.onboarding ?? false;
 		}
 	});
+
+	// Desktop App OAuth Bridge:登录成功后把 JWT 存到 bridge 端点
+	$: if ($page?.url?.searchParams?.get('bridge')) {
+		const bridgeId = $page.url.searchParams.get('bridge');
+		const token = localStorage.getItem('token');
+		if (token && bridgeId) {
+			fetch(`/api/v1/auths/bridge/${bridgeId}/deposit`, {
+				method: 'POST',
+				headers: { Authorization: `Bearer ${token}` }
+			}).then(() => {
+				console.log('Bridge token deposited for', bridgeId);
+			});
+		}
+	}
 </script>
 
 <svelte:head>
