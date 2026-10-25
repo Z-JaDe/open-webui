@@ -2,6 +2,7 @@
 	// /goals:goal 会话面——列表选中 goal,右侧看内部会话转录(管理者/子代理/审查者)。
 	// 数据源 /banyan/api/goals 与 /goals/:id/convs(pi-goal durable 转录,只读)。
 	import { onMount } from 'svelte';
+	import { showSidebar } from '$lib/stores';
 	import {
 		getBanyanGoalConvs,
 		getBanyanGoals,
@@ -90,7 +91,11 @@
 	<title>Goal 会话</title>
 </svelte:head>
 
-<div class="flex flex-col h-full min-h-0 w-full max-w-full">
+<div
+	class="flex flex-col h-full min-h-0 w-full max-w-full transition-width duration-200 ease-in-out {$showSidebar
+		? 'md:max-w-[calc(100%-var(--sidebar-width))]'
+		: ''}"
+>
 	<div class="flex-1 overflow-y-auto">
 		<div class="max-w-full mx-auto w-full px-4 py-8">
 			<div class="flex items-center gap-2 mb-1">
