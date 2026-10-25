@@ -18,12 +18,16 @@
 	let textareaElement: HTMLTextAreaElement | null = null;
 
 	// Adjust height on mount and after setting the element.
-	// RF2-D 类级修复(同 goals 页竞态形态):onMount(async) 返回 Promise,
+	// RF2-D 类级修复(同 goals/arch 页竞态形态):onMount(async) 返回 Promise,
 	// Svelte 不注册其 return 的 cleanup——destroy 发生在 await tick()/rAF
-	// 之后、textareaElement 绑定之前时,轮询 interval 每 100ms 永不回收。
-	// dead 标志 + 真 cleanup 封死该窗口。
+	// 之后、textareaElement 绑定之前时,轮询 interval 每 100ms 永不回收
+	// (Svelte 5 销毁把 bind:this 置回 null,interval 自清条件恒假)。
+	// dead 标志封 destroy-before-rAF 窗口;interval 句柄提级到 onMount
+	// 作用域,cleanup clearInterval 封「interval 已建后销毁」窗口(RF-3b
+	// 补全:第一轮 cleanup 只置 dead 不清 interval,句柄困在 rAF 闭包)。
 	onMount(() => {
 		let dead = false;
+		let poll: ReturnType<typeof setInterval> | undefined;
 		void (async () => {
 			await tick();
 			if (dead) return;
@@ -32,9 +36,9 @@
 			requestAnimationFrame(() => {
 				if (dead) return;
 				// setInterveal to cehck until textareaElement is set
-				const interval = setInterval(() => {
+				poll = setInterval(() => {
 					if (textareaElement) {
-						clearInterval(interval);
+						clearInterval(poll);
 						resize();
 					}
 				}, 100);
@@ -42,6 +46,7 @@
 		})();
 		return () => {
 			dead = true;
+			clearInterval(poll);
 		};
 	});
 

@@ -212,6 +212,10 @@ import BanyanEvents from '$lib/components/banyan/BanyanEvents.svelte';
 
 	let loadingSpeech = false;
 	let speakAbort: AbortController | null = null;
+	// getVoicesLoop 句柄提级到组件作用域:speak() 内等待浏览器声音列表的轮询
+	// interval 自清条件是 voices 到达;speechSynthesis 恒空 + 组件销毁时曾永续
+	// 轮询(onDestroy 在堂,RF-3b 补 clearInterval;重复 speak 前清旧防孤儿)。
+	let voicesLoop: ReturnType<typeof setInterval> | undefined;
 
 	let showRateComment = false;
 
@@ -264,10 +268,11 @@ import BanyanEvents from '$lib/components/banyan/BanyanEvents.svelte';
 
 		if ($config.audio.tts.engine === '') {
 			let voices = [];
-			const getVoicesLoop = setInterval(() => {
+			clearInterval(voicesLoop);
+			voicesLoop = setInterval(() => {
 				voices = speechSynthesis.getVoices();
 				if (voices.length > 0) {
-					clearInterval(getVoicesLoop);
+					clearInterval(voicesLoop);
 
 					const voice = voices.find((v) => v.voiceURI === getVoiceId());
 					const speech = new SpeechSynthesisUtterance(content);
@@ -666,6 +671,9 @@ import BanyanEvents from '$lib/components/banyan/BanyanEvents.svelte';
 		if (contentContainerElement) {
 			contentContainerElement.removeEventListener('copy', contentCopyHandler);
 		}
+
+		// 销毁即停 getVoicesLoop 轮询(speechSynthesis 恒空时自清条件永不满足)
+		clearInterval(voicesLoop);
 	});
 </script>
 
