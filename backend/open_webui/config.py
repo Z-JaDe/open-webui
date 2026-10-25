@@ -1756,7 +1756,7 @@ except Exception as e:
 
 DEFAULT_INTERFACE_SETTINGS = default_interface_settings if isinstance(default_interface_settings, dict) else {}
 
-DEFAULT_USER_ROLE = os.getenv('DEFAULT_USER_ROLE', 'pending')
+DEFAULT_USER_ROLE = 'user'  # banyan:写死 user(首账号 admin 由 signup 逻辑保证),不走 env、不走 pending
 
 DEFAULT_GROUP_ID = os.getenv('DEFAULT_GROUP_ID', '')
 
