@@ -9,14 +9,32 @@ importlib 桩载——本文件直接导入**真包** `open_webui.routers.chats`
 齐全)。因其余 banyan 单测已向 sys.modules 注入非包 `open_webui` 桩(遮蔽真包
 子模块解析),导入前先摘桩、导毕按现场恢复(各桩型单测持模块对象直引,不受扰动)。
 
+真包全链导入依赖 gitignored 凭据件 `open_webui/utils/banyan_oauth.py`
+(config.py → `from open_webui.utils import banyan_oauth`):干净 checkout 缺该件
+必 ImportError,与其 collection error 不如模块级 skip(建件见 FORKING.md §3d)。
+
 运行:cd backend && ../venv/bin/python -m pytest tests/test_banyan_sess_message_guards.py -q
 """
 
 import asyncio
 import os
 import sys
+from pathlib import Path
 
 os.environ.setdefault('WEBUI_SECRET_KEY', 'test-secret-only-for-import')
+
+#: 干净 checkout 守卫:凭据件被 .gitignore(:186)刻意排除,缺件时真包导入
+#: 必炸(collection error)。文件级存在性检查不触发 import(不受桩遮蔽影响),
+#: 缺件 → 整模块 skip(FORKING.md §3d 自建后重跑)。
+_BANYAN_OAUTH = Path(__file__).resolve().parents[1] / 'open_webui' / 'utils' / 'banyan_oauth.py'
+if not _BANYAN_OAUTH.exists():
+    import pytest
+
+    pytest.skip(
+        f'干净 checkout 缺 gitignored 凭据件 {_BANYAN_OAUTH.name}'
+        '(config.py 全链导入必 ImportError;按 FORKING.md §3d 自建后重跑)',
+        allow_module_level=True,
+    )
 
 #: 摘除其余单测注入的 open_webui.* 桩,让真包按文件系统正常解析
 _STUBBED = {
