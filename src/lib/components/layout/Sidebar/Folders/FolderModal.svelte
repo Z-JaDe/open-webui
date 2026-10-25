@@ -14,7 +14,6 @@
 	import ModelSelector from '$lib/components/chat/ModelSelector/Selector.svelte';
 
 	import Textarea from '$lib/components/common/Textarea.svelte';
-	import Knowledge from '$lib/components/banyan/KnowledgeEditor.svelte';
 	import { getFolderById } from '$lib/apis/folders';
 	const i18n = getContext<Writable<I18n>>('i18n');
 
@@ -275,16 +274,7 @@
 					{/if}
 
 					<div class="my-2">
-						<Knowledge bind:selectedItems={data.files}>
-							<div slot="label">
-								<div class="flex w-full justify-between">
-									<div class=" text-xs text-gray-500">
-										{$i18n.t('Knowledge')}
-									</div>
-								</div>
 							</div>
-						</Knowledge>
-					</div>
 
 					<div class="flex justify-end pt-3 text-sm font-normal gap-1.5">
 						<button

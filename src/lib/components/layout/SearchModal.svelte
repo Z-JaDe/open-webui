@@ -30,8 +30,7 @@
 	import Messages from '../chat/Messages.svelte';
 	import { goto } from '$app/navigation';
 	import EditPencilIcon from './Sidebar/icons/EditPencil.svelte';
-	import NotesIcon from './Sidebar/icons/Notes.svelte';
-
+	
 	import ChatMenu from './Sidebar/ChatMenu.svelte';
 	import ShareChatModal from '../chat/ShareChatModal.svelte';
 	import DeleteConfirmDialog from '../common/ConfirmDialog.svelte';
@@ -261,20 +260,6 @@
 			},
 			icon: EditPencilIcon
 		},
-		...(($config?.features?.enable_notes ?? false) &&
-		($user?.role === 'admin' || ($user?.permissions?.features?.notes ?? true))
-			? [
-					{
-						label: $i18n.t('Create a new note'),
-						onClick: async () => {
-							await goto(`/notes/new?content=${encodeURIComponent(query)}`);
-							show = false;
-							onClose();
-						},
-						icon: NotesIcon
-					}
-				]
-			: [])
 	];
 
 	let query = '';

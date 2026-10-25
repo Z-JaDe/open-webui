@@ -73,7 +73,7 @@
 							<button
 								class="min-w-fit px-1 text-sm select-none transition"
 								aria-label={$i18n.t('Back')}
-								on:click={() => goto('/registry')}
+								on:click={() => goto('/goals')}
 								type="button"
 								>
 									任务

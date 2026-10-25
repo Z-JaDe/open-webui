@@ -115,15 +115,7 @@
 				{/if}
 
 				<div class="mt-1.5 flex items-center gap-2">
-					{#if sessionLink(card)}
-						<a
-							class="text-[11px] text-blue-600 dark:text-blue-400 hover:underline"
-							href="/audit?session_id={encodeURIComponent(sessionLink(card))}"
-							>
-								打开子代理会话
-							</a>
-					{/if}
-					{#if card.status === 'running'}
+						{#if card.status === 'running'}
 						<button
 							type="button"
 							class="ml-auto text-[11px] px-2 py-0.5 rounded-md border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
