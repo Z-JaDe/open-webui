@@ -259,3 +259,14 @@ async def resolve_conv_header(metadata: Optional[dict], url: str) -> Optional[st
     except Exception as e:  # 绝不让映射问题炸掉对话
         log.warning('banyan_conv: 解析 chat %s 绑定异常: %s', chat_id, e)
         return None
+
+
+def resolve_space_header(metadata: Optional[dict], url: str) -> Optional[str]:
+    """v3.1(模型与空间正交):转发目标是引擎且请求 metadata 带 space → 注
+    X-Banyan-Space(新会话首转绑定;已绑会话引擎按 meta 优先,头被忽略)。"""
+    if not is_banyan_target(url):
+        return None
+    if not isinstance(metadata, dict) or metadata.get('task'):
+        return None
+    space = metadata.get('space')
+    return str(space) if space else None

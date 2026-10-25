@@ -127,6 +127,26 @@
 	let showChatsMenu = false;
 	let showBanyanTasks = true;
 
+	// v3.1 工作空间切换器(模型与空间正交:空间=上下文包,模型另选,空间只供默认模型)
+	import { currentWorkspace } from '$lib/stores';
+	import { getBanyanWorkspaces } from '$lib/apis/banyan';
+	let banyanSpaces: Array<{ id: string; name: string; agent: { model: string } }> = [];
+	const loadBanyanSpaces = async () => {
+		try {
+			banyanSpaces = await getBanyanWorkspaces();
+			if (!$currentWorkspace?.id && banyanSpaces.length > 0) {
+				const first = banyanSpaces[0];
+				currentWorkspace.set({ id: first.id, name: first.name, model: first.agent?.model ?? '' });
+			}
+		} catch {
+			banyanSpaces = [];
+		}
+	};
+	const switchBanyanSpace = (id: string) => {
+		const sp = banyanSpaces.find((x) => x.id === id);
+		if (sp) currentWorkspace.set({ id: sp.id, name: sp.name, model: sp.agent?.model ?? '' });
+	};
+
 	// banyan 任务分区入口（钩点③；WE-7 起含 /arch 架构页；v3 W2/W3 追加 inbox/cal 两行）
 	// v3 W2 信箱徽标数据源（import 与徽标逻辑一并登记在钩点③内）
 	import { getBanyanGoalCards, getBanyanInbox } from '$lib/apis/banyan';
@@ -168,6 +188,7 @@
 		}
 	};
 	onMount(() => {
+		loadBanyanSpaces();
 		refreshBanyanInboxPending();
 		// goal 人卡无事件流,30s 轻量轮询徽标(goal 卡出现=任务在阻塞等人)
 		refreshBanyanGoalCardsPending();
@@ -1280,9 +1301,24 @@
 				>
 					<div class="pb-1">
 						<div class="px-1 flex justify-center text-gray-700 dark:text-gray-300">
-							<a
-								id="sidebar-new-chat-button"
-								class="group grow flex items-center space-x-2 rounded-xl px-2 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-900 transition outline-none"
+							{#if banyanSpaces.length > 0}
+						<div class="px-1 mb-1.5 flex items-center gap-2 rounded-xl px-2 py-1.5 bg-gray-50 dark:bg-gray-900/60">
+							<div class="text-[11px] text-gray-400 shrink-0">空间</div>
+							<select
+								class="flex-1 min-w-0 bg-transparent text-[0.8125rem] text-gray-800 dark:text-gray-100 outline-none cursor-pointer"
+								value={$currentWorkspace?.id ?? ''}
+								on:change={(e) => switchBanyanSpace(e.target.value)}
+								aria-label="工作空间"
+							>
+								{#each banyanSpaces as sp (sp.id)}
+									<option value={sp.id}>{sp.name}</option>
+								{/each}
+							</select>
+						</div>
+					{/if}
+					<a
+						id="sidebar-new-chat-button"
+						class="group grow flex items-center space-x-2 rounded-xl px-2 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-900 transition outline-none"
 								href="/"
 								draggable="false"
 								on:click={newChatHandler}

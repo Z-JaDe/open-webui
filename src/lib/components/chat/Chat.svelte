@@ -15,6 +15,7 @@
 	import equal from 'fast-deep-equal';
 
 	import {
+	currentWorkspace,
 		chatId,
 		config,
 		type Model,
@@ -2641,7 +2642,10 @@
 					selectedModels = JSON.parse(sessionStorage.selectedModels);
 					sessionStorage.removeItem('selectedModels');
 				} else {
-					if ($settings?.models) {
+					if ($currentWorkspace?.model && availableModels.includes($currentWorkspace.model)) {
+						// v3.1:空间默认模型(可换——模型与空间正交,默认仅是缺省)
+						selectedModels = [$currentWorkspace.model];
+					} else if ($settings?.models) {
 						// Set from user settings
 						selectedModels = $settings?.models;
 					} else if (defaultModels && defaultModels.length > 0) {
@@ -4268,6 +4272,7 @@
 
 				session_id: $socket?.id,
 				chat_id: _chatId || undefined,
+				space: $currentWorkspace?.id || undefined,
 				folder_id: $selectedFolder?.id ?? undefined,
 
 				id: responseMessageId,

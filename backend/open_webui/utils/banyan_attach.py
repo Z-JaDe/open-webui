@@ -59,7 +59,7 @@ def is_banyan_model(model: dict | None, body_model: str = '') -> bool:
         meta = ((model or {}).get('info') or {}).get('meta') or {}
     except Exception:
         return False
-    return isinstance(meta, dict) and meta.get('kind') in ('tier', 'space')
+    return isinstance(meta, dict) and meta.get('kind') in ('tier', 'space', 'banyan')
 
 
 # ── D18:多模态剥离 + 附件行携带 ──

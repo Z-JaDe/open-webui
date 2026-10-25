@@ -50,7 +50,7 @@ ENGINE_CHAT_PREFIX = 'sess_'
 #: 引擎 API 轻量调用超时(秒)
 _API_TIMEOUT = 10.0
 #: 行回补投影的缺省模型 id(v3:仅展示位;新轮的 model 由请求携带=空间模型)
-DEFAULT_MODEL_ID = 'banyan-bootstrap'
+DEFAULT_MODEL_ID = 'glm-5.3-flash'
 #: 行全量回补的单页上限(引擎 /api/sessions/{id}/rows 的 limit 夹在 1..200)
 _ROWS_PAGE = 200
 #: 行回补页数上限(200×100=2 万行)——单机会话远达不到,防御引擎异常时兜底退出

@@ -190,6 +190,23 @@ export const desktopEvent: Writable<DesktopEvent | null> = writable(null);
 
 export const isLastActiveTab = writable(true);
 export const playingNotificationSound = writable(false);
+// v3.1 工作空间(模型与空间正交):当前空间=新会话的上下文包;
+// model=该空间默认模型(仅默认,聊天内可随意换模型)。
+export interface CurrentWorkspace {
+	id: string;
+	name: string;
+	model: string;
+}
+const _wsInit: CurrentWorkspace =
+	typeof localStorage !== 'undefined' && localStorage.getItem('banyan-workspace')
+		? JSON.parse(localStorage.getItem('banyan-workspace') as string)
+		: { id: '', name: '', model: '' };
+export const currentWorkspace: Writable<CurrentWorkspace> = writable(_wsInit);
+currentWorkspace.subscribe((v) => {
+	try {
+		localStorage.setItem('banyan-workspace', JSON.stringify(v));
+	} catch {}
+});
 
 export type Model = OpenAIModel | OllamaModel;
 
