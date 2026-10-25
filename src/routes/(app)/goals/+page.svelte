@@ -80,7 +80,7 @@
 			]
 		: [];
 
-	$: activeTranscript: TMsg[] =
+	$: activeTranscript =
 		convs === null
 			? []
 			: tab === 'manager'
