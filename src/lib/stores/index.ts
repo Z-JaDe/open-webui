@@ -68,7 +68,6 @@ export const channels = writable<ChannelListItem[]>([]);
 export const channelId = writable(null);
 
 export { chats, pinnedChats } from './chatList';
-export const pinnedNotes = writable([]);
 export const tags = writable([]);
 export const folders = writable([]);
 
@@ -197,10 +196,26 @@ export interface CurrentWorkspace {
 	name: string;
 	model: string;
 }
-const _wsInit: CurrentWorkspace =
-	typeof localStorage !== 'undefined' && localStorage.getItem('banyan-workspace')
-		? JSON.parse(localStorage.getItem('banyan-workspace') as string)
-		: { id: '', name: '', model: '' };
+// F6:key 损坏(截断/手改/异版写入)不得炸模块加载——JSON.parse 包 try/catch
+// 回退空对象,字段形状校验后回退;stale id 由 Sidebar.loadBanyanSpaces 校验重置。
+const _wsInit: CurrentWorkspace = (() => {
+	if (typeof localStorage === 'undefined') return { id: '', name: '', model: '' };
+	try {
+		const raw = localStorage.getItem('banyan-workspace');
+		const parsed = raw ? (JSON.parse(raw) as unknown) : null;
+		if (parsed && typeof parsed === 'object') {
+			const p = parsed as Record<string, unknown>;
+			return {
+				id: typeof p.id === 'string' ? p.id : '',
+				name: typeof p.name === 'string' ? p.name : '',
+				model: typeof p.model === 'string' ? p.model : ''
+			};
+		}
+		return { id: '', name: '', model: '' };
+	} catch {
+		return { id: '', name: '', model: '' };
+	}
+})();
 export const currentWorkspace: Writable<CurrentWorkspace> = writable(_wsInit);
 currentWorkspace.subscribe((v) => {
 	try {
@@ -322,10 +337,9 @@ type Settings = {
 	renderMarkdownInUserMessages?: boolean;
 	renderMarkdownInAssistantMessages?: boolean;
 	recentEmojis?: string[];
-	pinnedMenuItems?: string[];
-	pinnedNotesOrder?: string[];
+		pinnedMenuItems?: string[];
 
-	defaultUploadContext?: 'full' | 'focused';
+		defaultUploadContext?: 'full' | 'focused';
 
 	system?: string;
 	seed?: number;

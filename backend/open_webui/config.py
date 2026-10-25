@@ -2092,9 +2092,10 @@ AUTOMATION_MIN_INTERVAL = os.getenv('AUTOMATION_MIN_INTERVAL', '')
 
 AUTOMATION_AUTH_TOKEN_EXPIRES_IN = os.getenv('AUTOMATION_AUTH_TOKEN_EXPIRES_IN', '1h')
 
-# D23(完整方案.md 弃用裁决):Notes UI 已退役——默认不可再写 fork notes 表;
-# 仅改缺省值,上游代码零删除(notes 路由全部经 check_notes_access 关闸)。
-ENABLE_NOTES = os.getenv('ENABLE_NOTES', 'False').lower() == 'true'
+# D23/F3:ENABLE_NOTES 与持久键 notes.enable 已删——5aafbc6 笔记功能整体退役
+# (路由卸载/入口全删/get_app_config 不投影),残留开关零消费者;models/notes.py
+# 按上游休眠设计保留(builtin 工具等 8 个上游消费方)。存量 DB 行不迁移,
+# Config.get 对已删键返回 None(读取方 tools.py 分支已一并摘除)。
 
 ENABLE_USER_STATUS = os.getenv('ENABLE_USER_STATUS', 'True').lower() == 'true'
 
@@ -3213,7 +3214,6 @@ DEFAULT_CONFIG = {
     'automations.max_count': AUTOMATION_MAX_COUNT,
     'automations.min_interval': AUTOMATION_MIN_INTERVAL,
     'automations.auth_token_expires_in': AUTOMATION_AUTH_TOKEN_EXPIRES_IN,
-    'notes.enable': ENABLE_NOTES,
     'users.enable_status': ENABLE_USER_STATUS,
     'evaluation.arena.enable': ENABLE_EVALUATION_ARENA_MODELS,
     'evaluation.arena.models': EVALUATION_ARENA_MODELS,

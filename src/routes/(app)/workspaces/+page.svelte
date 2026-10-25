@@ -4,7 +4,11 @@
 	// 页面即视图,Chat 即编辑器:自建空间在其会话里说人话即可改;内置空间在气根空间改。
 	import { onMount } from 'svelte';
 	import { showSidebar } from '$lib/stores';
-	import { getBanyanWorkspaces, type BanyanWorkspace } from '$lib/apis/banyan';
+	import {
+		getBanyanWorkspaces,
+		type BanyanWorkspace,
+		type BanyanWorkspaceListResult
+	} from '$lib/apis/banyan';
 
 	let loaded = false;
 	let error = '';
@@ -15,10 +19,18 @@
 	let selSkill = '';
 	let selRole = '';
 	let selScope = '';
+	// RF1-D:注册表级警告(同名冲突/坏配置空间)。后端 banyan 仓并行加键,
+	// 缺键(旧引擎)时 undefined → 不渲染,向后兼容。
+	let registryConflicts: string[] | undefined;
+	let registryErrors: Record<string, string> | undefined;
 
 	async function refresh() {
 		try {
-			spaces = await getBanyanWorkspaces();
+			const result: BanyanWorkspaceListResult = await getBanyanWorkspaces();
+			spaces = result.workspaces;
+			registryConflicts = result.conflicts;
+			registryErrors = result.errors;
+			error = ''; // F14:refresh 成功清 error(失败横幅不再跨刷新滞留)
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 		}
@@ -85,12 +97,36 @@
 			</p>
 
 			{#if error}
-				<div class="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-4 text-sm text-red-600 dark:text-red-400">
+				<!-- F14:失败态不与空态卡并显——引擎不可达时只出错误横幅(带重试) -->
+				<div class="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-4 text-sm text-red-600 dark:text-red-400 mb-6">
 					引擎不可达:{error}
+					<button
+						class="ml-2 underline underline-offset-2 hover:opacity-70"
+						on:click={() => refresh()}
+					>
+						重试
+					</button>
 				</div>
 			{/if}
 
-			{#if loaded}
+			{#if registryConflicts && registryConflicts.length > 0}
+				<!-- RF1-D:同名冲突(内置 ∪ 自建不做覆盖,单一真相)——冲突名不在
+				workspaces 列表里,不点选只示警 -->
+				<div class="rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 p-4 text-sm text-amber-600 dark:text-amber-400 mb-6">
+					空间名冲突(同名不覆盖):{registryConflicts.join('、')}
+				</div>
+			{/if}
+
+			{#if registryErrors && Object.keys(registryErrors).length > 0}
+				<!-- RF1-D:坏配置空间(id → 错误摘要) -->
+				<div class="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-4 text-sm text-red-600 dark:text-red-400 mb-6">
+					{#each Object.entries(registryErrors) as [id, err] (id)}
+						<div>坏空间 {id}:{err.slice(0, 80)}</div>
+					{/each}
+				</div>
+			{/if}
+
+			{#if loaded && !error}
 				<!-- 空间卡片 -->
 				<div class="grid gap-3 md:grid-cols-2 mb-8">
 					{#each spaces as s (s.id)}
@@ -112,7 +148,7 @@
 							<div class="mt-2 flex items-center gap-3 text-[10px] text-gray-400">
 								<span>主Agent:{s.agent.model || s.agent.tier}</span>
 								{#if s.staging}<span class="text-amber-500">预发通道</span>{/if}
-								{#if s.degraded}<span class="text-red-500">配置降级中:{s.error.slice(0, 40)}</span>{/if}
+								{#if s.degraded}<span class="text-red-500">配置降级中:{s.error?.slice?.(0, 40) ?? ''}</span>{/if}
 							</div>
 						</button>
 					{:else}
@@ -173,22 +209,32 @@
 										<pre class="text-xs leading-relaxed whitespace-pre-wrap text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 max-h-96 overflow-y-auto">{body}</pre>
 									{/if}
 								{/if}
-							{:else if tab === 'knowledge'}
-								{#if detail.knowledge_scopes.length === 0}
-									<span class="text-xs text-gray-400">未挂知识域</span>
-								{:else}
-									<div class="flex flex-wrap gap-2 mb-3">
-										{#each detail.knowledge_scopes as k (k)}
-											<button
-												class="text-xs px-2 py-1 rounded-lg transition {selScope === k
-													? 'bg-gray-900 text-white dark:bg-white dark:text-black'
-													: 'bg-gray-100 dark:bg-gray-850 text-gray-700 dark:text-gray-200'}"
-												on:click={() => (selScope = selScope === k ? '' : k)}
-											>
-												{k}
-											</button>
-										{/each}
-									</div>
+								{:else if tab === 'knowledge'}
+									{@const scopeButtons = [
+										...detail.knowledge_scopes,
+										// P2-2:「(空间私有)」域引擎恒扫描(knowledge_detail 里恒有条目)但
+										// 从不进 knowledge_scopes 投影——补入口使扫描结果可达;条件渲染,
+										// 后端未发该条目时(旧引擎/无私有知识)不显示,无新键依赖。
+										...(detail.knowledge_detail?.some((x) => x.scope === '(空间私有)') &&
+										!detail.knowledge_scopes.includes('(空间私有)')
+											? ['(空间私有)']
+											: [])
+									]}
+									{#if scopeButtons.length === 0}
+										<span class="text-xs text-gray-400">未挂知识域</span>
+									{:else}
+										<div class="flex flex-wrap gap-2 mb-3">
+											{#each scopeButtons as k (k)}
+												<button
+													class="text-xs px-2 py-1 rounded-lg transition {selScope === k
+														? 'bg-gray-900 text-white dark:bg-white dark:text-black'
+														: 'bg-gray-100 dark:bg-gray-850 text-gray-700 dark:text-gray-200'}"
+													on:click={() => (selScope = selScope === k ? '' : k)}
+												>
+													{k}
+												</button>
+											{/each}
+										</div>
 									{#if selScope}
 										{@const kd = detail.knowledge_detail?.find((x) => x.scope === selScope)}
 										<div class="text-[11px] text-gray-400 mb-1">{selScope} · 共 {kd?.total ?? 0} 条</div>

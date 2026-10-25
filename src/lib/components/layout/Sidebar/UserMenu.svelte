@@ -23,7 +23,6 @@
 	import HelpCircleIcon from './icons/HelpCircle.svelte';
 	import LogOutIcon from './icons/LogOut.svelte';
 	import MapIcon from './icons/Map.svelte';
-	import NotesIcon from './icons/Notes.svelte';
 	import PinIcon from './icons/Pin.svelte';
 	import PinSlashIcon from './icons/PinSlash.svelte';
 	import Settings from '$lib/components/icons/Settings.svelte';
@@ -52,12 +51,15 @@
 
 	const dispatch = createEventDispatcher();
 
-	// D23:侧栏 Notes 入口摘除——默认与存量 settings 一并过滤'notes'(与 Sidebar 同口径)
-	const DEFAULT_PINNED_ITEMS = ['workspace'];
+	// D23:默认与存量 settings 一并过滤 'notes'(与 Sidebar 同口径)。
+	// F7:pin id 半拉子迁移收口——Sidebar 渲染门只认 'workspaces'
+	// (getMenuItemMeta 键集),此处 DEFAULT/togglePin/判显全部用 'workspaces',
+	// 并把存量 saved 'workspace' 读侧映射为 'workspaces'(与 'notes' 过滤同型)。
+	const DEFAULT_PINNED_ITEMS = ['workspaces'];
 
-	$: pinnedItems = ($settings?.pinnedMenuItems ?? DEFAULT_PINNED_ITEMS).filter(
-		(id) => id !== 'notes'
-	);
+	$: pinnedItems = ($settings?.pinnedMenuItems ?? DEFAULT_PINNED_ITEMS)
+		.map((id: string) => (id === 'workspace' ? 'workspaces' : id))
+		.filter((id: string) => id !== 'notes');
 
 	const isPinned = (id: string) => {
 		return pinnedItems.includes(id);
@@ -244,51 +246,51 @@
 				<hr class="border-gray-50/30 dark:border-gray-800/30 my-0.5 mx-1 p-0" />
 			{/if}
 
-			{#if $user?.role === 'admin' || $user?.permissions?.workspace?.models || $user?.permissions?.workspace?.knowledge || $user?.permissions?.workspace?.prompts || $user?.permissions?.workspace?.tools || $user?.permissions?.workspace?.skills}
-				<div
-					class="user-menu-row flex items-center w-full rounded-xl hover:bg-gray-50/60 dark:hover:bg-gray-800/60 transition-colors"
+			<!-- F15:workspaces 入口登录即可见(与 Sidebar isMenuItemVisible 同口径;
+			旧 workspace.models/knowledge/prompts/tools/skills 权限门控的是已删功能) -->
+			<div
+				class="user-menu-row flex items-center w-full rounded-xl hover:bg-gray-50/60 dark:hover:bg-gray-800/60 transition-colors"
+			>
+				<a
+					href="/workspace"
+					draggable="false"
+					class="flex flex-1 min-w-0 h-[1.6875rem] items-center gap-2 rounded-xl px-2 text-[0.8125rem] cursor-pointer select-none"
+					on:click={async (e) => {
+						if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+						e.preventDefault();
+						show = false;
+						goto('/workspace');
+						if ($mobile) {
+							await tick();
+							showSidebar.set(false);
+						}
+					}}
 				>
-					<a
-						href="/workspace"
-						draggable="false"
-						class="flex flex-1 min-w-0 h-[1.6875rem] items-center gap-2 rounded-xl px-2 text-[0.8125rem] cursor-pointer select-none"
-						on:click={async (e) => {
-							if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
-							e.preventDefault();
-							show = false;
-							goto('/workspace');
-							if ($mobile) {
-								await tick();
-								showSidebar.set(false);
-							}
-						}}
+					<div class="self-center">
+						<WorkspaceIcon className="size-3.5" strokeWidth="1.5" />
+					</div>
+					<div class="self-center truncate">{$i18n.t('Workspace')}</div>
+				</a>
+				{#if shiftKey}
+					<Tooltip
+						content={pinnedItems.includes('workspaces')
+							? $i18n.t('Unpin from Sidebar')
+							: $i18n.t('Pin to Sidebar')}
 					>
-						<div class="self-center">
-							<WorkspaceIcon className="size-3.5" strokeWidth="1.5" />
-						</div>
-						<div class="self-center truncate">{$i18n.t('Workspace')}</div>
-					</a>
-					{#if shiftKey}
-						<Tooltip
-							content={pinnedItems.includes('workspace')
-								? $i18n.t('Unpin from Sidebar')
-								: $i18n.t('Pin to Sidebar')}
+						<button
+							type="button"
+							class="p-1 mr-1 rounded-lg hover:bg-gray-100/60 dark:hover:bg-gray-700/60 transition"
+							on:click|preventDefault|stopPropagation={() => togglePin('workspaces')}
 						>
-							<button
-								type="button"
-								class="p-1 mr-1 rounded-lg hover:bg-gray-100/60 dark:hover:bg-gray-700/60 transition"
-								on:click|preventDefault|stopPropagation={() => togglePin('workspace')}
-							>
-								{#if pinnedItems.includes('workspace')}
-									<PinSlashIcon className="size-3.5" strokeWidth="1.5" />
-								{:else}
-									<PinIcon className="size-3.5" strokeWidth="1.5" />
-								{/if}
-							</button>
-						</Tooltip>
-					{/if}
-				</div>
-			{/if}
+							{#if pinnedItems.includes('workspaces')}
+								<PinSlashIcon className="size-3.5" strokeWidth="1.5" />
+							{:else}
+								<PinIcon className="size-3.5" strokeWidth="1.5" />
+							{/if}
+						</button>
+					</Tooltip>
+				{/if}
+			</div>
 
 			{#if $config?.features?.enable_calendar && ($user?.role === 'admin' || $user?.permissions?.features?.calendar)}
 				<div

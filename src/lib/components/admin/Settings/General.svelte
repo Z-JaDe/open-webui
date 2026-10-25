@@ -337,18 +337,12 @@
 						/>
 					</AdminSettingRow>
 				{/if}
-				<AdminSettingRow
-					label={$i18n.t('settings.admin.general.notes.label')}
-					description={$i18n.t('settings.admin.general.notes.description')}
-					let:labelId
-				>
-					<Switch bind:state={adminConfig.ENABLE_NOTES} ariaLabelledbyId={labelId} />
-				</AdminSettingRow>
-				<AdminSettingRow
-					label={$i18n.t('settings.admin.general.channels.label')}
-					description={$i18n.t('settings.admin.general.channels.description')}
-					let:labelId
-				>
+			<!-- F3:Notes 开关已删(5aafbc6 笔记功能整体退役,toggle 已无任何消费者) -->
+			<AdminSettingRow
+				label={$i18n.t('settings.admin.general.channels.label')}
+				description={$i18n.t('settings.admin.general.channels.description')}
+				let:labelId
+			>
 					<Switch bind:state={adminConfig.ENABLE_CHANNELS} ariaLabelledbyId={labelId} />
 				</AdminSettingRow>
 				{#if adminConfig.ENABLE_CHANNELS}

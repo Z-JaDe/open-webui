@@ -628,7 +628,6 @@ async def get_builtin_tools(
         'image_generation.enable',
         'images.edit.enable',
         'code_interpreter.enable',
-        'notes.enable',
         'channels.enable',
         'automations.enable',
         'calendar.enable',
@@ -831,11 +830,10 @@ async def get_builtin_tools(
     ):
         builtin_functions.append(execute_code)
 
-    # Notes tools - search, view, create, and update user's notes
-    if is_note_chat or (
-        is_builtin_tool_enabled('notes') and config.get('notes.enable') and await has_user_permission('notes')
-    ):
-        builtin_functions.extend([search_notes, view_note, write_note, replace_note_content])
+    # Notes tools(search/view/write/replace)分支已随笔记功能退役删除(F3):
+    # gate 读已删配置键 notes.enable,且 is_note_chat 的生产者(notes 路由)已卸载;
+    # 保留 is_builtin_tool_enabled('notes') 单判会放宽门(缺省 True),整支摘除。
+    # 模型挂载笔记的 view_note 通道(下方 noteIds 分支)不受影响。
 
     # Channels tools - search channels and messages
     if is_builtin_tool_enabled('channels') and config.get('channels.enable') and await has_user_permission('channels'):

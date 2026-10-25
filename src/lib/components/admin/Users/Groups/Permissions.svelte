@@ -422,42 +422,7 @@
 			</div>
 		{/if}
 
-		<div class="flex flex-col w-full">
-			<div class="flex w-full justify-between my-1">
-				<div class=" self-center text-xs font-normal">
-					{$i18n.t('Notes Sharing')}
-				</div>
-				<Switch bind:state={permissions.sharing.notes} ariaLabel={$i18n.t('Notes Sharing')} />
-			</div>
-			{#if defaultPermissions?.sharing?.notes && !permissions.sharing.notes}
-				<div>
-					<div class="text-xs text-gray-500">
-						{$i18n.t('This is a default user permission and will remain enabled.')}
-					</div>
-				</div>
-			{/if}
-		</div>
-
-		{#if permissions.sharing.notes}
-			<div class="flex flex-col w-full">
-				<div class="flex w-full justify-between my-1">
-					<div class=" self-center text-xs font-normal">
-						{$i18n.t('Notes Public Sharing')}
-					</div>
-					<Switch
-						bind:state={permissions.sharing.public_notes}
-						ariaLabel={$i18n.t('Notes Public Sharing')}
-					/>
-				</div>
-				{#if defaultPermissions?.sharing?.public_notes && !permissions.sharing.public_notes}
-					<div>
-						<div class="text-xs text-gray-500">
-							{$i18n.t('This is a default user permission and will remain enabled.')}
-						</div>
-					</div>
-				{/if}
-			</div>
-		{/if}
+		<!-- F3:Notes Sharing / Notes Public Sharing 两组开关已删(笔记功能 5aafbc6 整体退役) -->
 
 		<div class="flex flex-col w-full">
 			<div class="flex w-full justify-between my-1">
@@ -975,21 +940,7 @@
 			{/if}
 		</div>
 
-		<div class="flex flex-col w-full">
-			<div class="flex w-full justify-between my-1">
-				<div class=" self-center text-xs font-normal">
-					{$i18n.t('Notes')}
-				</div>
-				<Switch bind:state={permissions.features.notes} ariaLabel={$i18n.t('Notes')} />
-			</div>
-			{#if defaultPermissions?.features?.notes && !permissions.features.notes}
-				<div>
-					<div class="text-xs text-gray-500">
-						{$i18n.t('This is a default user permission and will remain enabled.')}
-					</div>
-				</div>
-			{/if}
-		</div>
+		<!-- F3:features.notes 开关已删(笔记功能 5aafbc6 整体退役) -->
 
 		<div class="flex flex-col w-full">
 			<div class="flex w-full justify-between my-1">

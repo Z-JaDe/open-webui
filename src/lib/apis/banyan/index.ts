@@ -900,7 +900,7 @@ export type BanyanWorkspace = {
 	name: string;
 	description: string;
 	builtin: boolean;
-	model_id: string;
+	// model_id 死投影已删(DA-3 契约4:v3.1 后 UI 零消费,后端 banyan 仓并行删除)
 	roots: string[];
 	skills: string[];
 	roles: string[];
@@ -929,15 +929,29 @@ export type BanyanWorkspace = {
 	}>;
 };
 
+// RF1-D:注册表错误投影(后端 banyan 仓并行加键,向后兼容——无键时不渲染警告)
+export type BanyanWorkspaceListResult = {
+	workspaces: BanyanWorkspace[];
+	/** 同名冲突的空间名(内置 ∪ 自建不做覆盖,单一真相) */
+	conflicts?: string[];
+	/** 坏配置空间:id → 错误摘要 */
+	errors?: Record<string, string>;
+};
+
 export const getBanyanWorkspaces = async (
 	token: string = localStorage.token
-): Promise<BanyanWorkspace[]> => {
+): Promise<BanyanWorkspaceListResult> => {
 	const res = await fetch(`${BANYAN_API_BASE_URL}/workspaces`, {
 		method: 'GET',
 		headers: { Authorization: `Bearer ${token}` }
 	});
 	if (!res.ok) throw new Error(await res.text());
-	return (await res.json()).workspaces ?? [];
+	const data = await res.json();
+	return {
+		workspaces: data?.workspaces ?? [],
+		conflicts: data?.conflicts,
+		errors: data?.errors
+	};
 };
 
 export const getBanyanWorkspace = async (

@@ -133,8 +133,20 @@
 	let banyanSpaces: Array<{ id: string; name: string; agent: { model: string } }> = [];
 	const loadBanyanSpaces = async () => {
 		try {
-			banyanSpaces = await getBanyanWorkspaces();
-			if (!$currentWorkspace?.id && banyanSpaces.length > 0) {
+			// RF1-D:getBanyanWorkspaces 返回 {workspaces, conflicts?, errors?}
+			// (后端 banyan 仓并行加键,缺键时向后兼容);冲突/坏空间警告归空间页渲染。
+			const { workspaces } = await getBanyanWorkspaces();
+			banyanSpaces = workspaces;
+			if (banyanSpaces.length > 0 && !$currentWorkspace?.id) {
+				const first = banyanSpaces[0];
+				currentWorkspace.set({ id: first.id, name: first.name, model: first.agent?.model ?? '' });
+			} else if (
+				banyanSpaces.length > 0 &&
+				$currentWorkspace?.id &&
+				!banyanSpaces.some((x) => x.id === $currentWorkspace.id)
+			) {
+				// F6:stale 空间 id(空间已删)重置为第一项——X-Banyan-Space 修复后
+				// 失效 id 会变成引擎侧真实 404 "workspace not found",必须防
 				const first = banyanSpaces[0];
 				currentWorkspace.set({ id: first.id, name: first.name, model: first.agent?.model ?? '' });
 			}
@@ -155,7 +167,7 @@
 	import { notifyBanyanDecision } from '$lib/utils/banyanNotify';
 
 	// v3 精简(2026-10-25):goal 内核为正主,侧边栏只留活跃面(目标/信箱/日历/架构)。
-	// v2 波次面(登记簿/审卡/审计/方案/会话树)退役出导航——路由保留,URL 直达(归档)。
+	// v2 波次面(登记簿/审卡/审计/方案/会话树)已随 5aafbc6 连根删除(无 URL 直达)。
 	const banyanTaskEntries = [
 		{ id: 'goals', label: 'Goal 会话', href: '/goals', prefix: '/goals' },
 		{ id: 'inbox', label: '信箱', href: '/inbox', prefix: '/inbox' },
@@ -244,10 +256,11 @@
 		folderRegistry[folder.id]?.setFolderItems?.();
 	};
 
-	// D23:过滤存量 settings 里残留的 'notes',保证侧栏入口摘除对老用户同样生效
-	$: pinnedItems = ($settings?.pinnedMenuItems ?? DEFAULT_PINNED_ITEMS).filter(
-		(id) => id !== 'notes'
-	);
+	// D23:过滤存量 settings 里残留的 'notes',保证侧栏入口摘除对老用户同样生效;
+	// F7:存量 'workspace'(UserMenu 旧半拉子 id)映射为 'workspaces'(与 'notes' 过滤同型)
+	$: pinnedItems = ($settings?.pinnedMenuItems ?? DEFAULT_PINNED_ITEMS)
+		.map((id: string) => (id === 'workspace' ? 'workspaces' : id))
+		.filter((id: string) => id !== 'notes');
 
 	$: isMenuItemVisible = (id) => {
 		switch (id) {
@@ -470,20 +483,11 @@
 
 		await Promise.all([
 			(async () => {
-				console.log('Init tags');
 				const _tags = await getAllTags(localStorage.token);
 				tags.set(_tags);
 			})(),
+			// F9:"Init pinned notes" 死分支已删(enable_notes 恒 undefined,笔记功能退役)
 			(async () => {
-				if (
-					$config?.features?.enable_notes &&
-					($user?.role === 'admin' || ($user?.permissions?.features?.notes ?? true))
-				) {
-					console.log('Init pinned notes');
-				}
-			})(),
-			(async () => {
-				console.log('Init chat list');
 				await refreshChatRows();
 			})()
 		]);

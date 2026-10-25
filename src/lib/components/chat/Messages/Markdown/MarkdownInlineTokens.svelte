@@ -49,11 +49,11 @@
 		try {
 			const url = new URL(href, window.location.origin);
 			// Check if same origin and an in-app route
+			// (F4:'/notes/' 拦截分支已删——路由已退役,存量消息里的笔记链接
+			// 不再被劫持进 404,交浏览器按外链处理)
 			if (
 				url.origin === window.location.origin &&
-				(url.pathname.startsWith('/notes/') ||
-					url.pathname.startsWith('/c/') ||
-					url.pathname.startsWith('/channels/'))
+				(url.pathname.startsWith('/c/') || url.pathname.startsWith('/channels/'))
 			) {
 				e.preventDefault();
 				goto(url.pathname + url.search + url.hash);

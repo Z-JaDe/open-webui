@@ -241,6 +241,25 @@
 		return selected.length ? selected : [''];
 	};
 
+	// P2-3(v3.1 空间默认模型竞态):initNewChat 时模型列表可能尚未从 /api/models
+	// 载入(availableModels 空快照),空间默认静默不生效。挂起标记+下方响应式补设:
+	// 列表到达且用户未手动改选(selectedModels 仍等于挂起值)时校验——不在目录
+	// 则回落用户默认链;用户改选/离开新会话一律不劫持。
+	let pendingWorkspaceModel = '';
+	$: if (pendingWorkspaceModel && chatIdProp === '' && $models.length > 0) {
+		const pending = pendingWorkspaceModel;
+		pendingWorkspaceModel = '';
+		if (selectedModels.length === 1 && selectedModels[0] === pending) {
+			const availableIds = $models
+				.filter((m) => !(m?.info?.meta?.hidden ?? false))
+				.map((m) => m.id);
+			if (!availableIds.includes(pending)) {
+				// 空间默认模型不在目录(空间被改/模型下线)→ 用户默认链兜底
+				selectedModels = normalizeSelectedModels([]);
+			}
+		}
+	}
+
 	$: {
 		const modelSearchParam =
 			$page.url.searchParams.get('models') || $page.url.searchParams.get('model');
@@ -2609,6 +2628,7 @@
 		};
 
 		if ($page.url.searchParams.get('models') || $page.url.searchParams.get('model')) {
+			pendingWorkspaceModel = ''; // URL 显式指定模型,挂起的空间默认不再适用
 			const urlModels = (
 				$page.url.searchParams.get('models') ||
 				$page.url.searchParams.get('model') ||
@@ -2632,28 +2652,37 @@
 			selectedModels = selectedModels.filter((modelId) =>
 				$models.map((m) => m.id).includes(modelId)
 			);
-		} else {
-			if ($selectedFolder) {
-				// Folder defaults are explicit; never inherit a previous chat's selection.
-				selectedModels = normalizeSelectedModels($selectedFolder.data?.model_ids ?? []);
 			} else {
-				if (sessionStorage.selectedModels) {
-					// Set from session storage (temporary selection)
-					selectedModels = JSON.parse(sessionStorage.selectedModels);
-					sessionStorage.removeItem('selectedModels');
+				pendingWorkspaceModel = '';
+				if ($selectedFolder) {
+					// Folder defaults are explicit; never inherit a previous chat's selection.
+					selectedModels = normalizeSelectedModels($selectedFolder.data?.model_ids ?? []);
 				} else {
-					if ($currentWorkspace?.model && availableModels.includes($currentWorkspace.model)) {
-						// v3.1:空间默认模型(可换——模型与空间正交,默认仅是缺省)
-						selectedModels = [$currentWorkspace.model];
-					} else if ($settings?.models) {
-						// Set from user settings
-						selectedModels = $settings?.models;
-					} else if (defaultModels && defaultModels.length > 0) {
-						// Set from default models
-						selectedModels = defaultModels;
+					if (sessionStorage.selectedModels) {
+						// Set from session storage (temporary selection)
+						selectedModels = JSON.parse(sessionStorage.selectedModels);
+						sessionStorage.removeItem('selectedModels');
+					} else {
+						if (
+							$currentWorkspace?.model &&
+							(availableModels.includes($currentWorkspace.model) ||
+								availableModels.length === 0)
+						) {
+							// v3.1:空间默认模型(可换——模型与空间正交,默认仅是缺省)。
+							// P2-3:列表未到(空快照)同样先采用空间默认并挂起,
+							// 待列表到达后由响应式补设校验(不在目录则回落用户默认)。
+							selectedModels = [$currentWorkspace.model];
+							pendingWorkspaceModel =
+								availableModels.length === 0 ? $currentWorkspace.model : '';
+						} else if ($settings?.models) {
+							// Set from user settings
+							selectedModels = $settings?.models;
+						} else if (defaultModels && defaultModels.length > 0) {
+							// Set from default models
+							selectedModels = defaultModels;
+						}
 					}
 				}
-			}
 
 			// Unavailable & hidden models filtering
 			selectedModels = normalizeSelectedModels(selectedModels);
@@ -2803,6 +2832,8 @@
 		noteChatDebug('loadChat start');
 		// chatIdProp is empty for chats started from the home page (URL set via replaceState)
 		chatId.set(chatIdProp || $chatId);
+		// P2-3:载入既有会话,挂起的空间默认补设不再适用(避免劫持该会话的模型)
+		pendingWorkspaceModel = '';
 		noteChatDebug('loadChat set active chat id');
 
 		if ($temporaryChatEnabled) {

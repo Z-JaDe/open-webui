@@ -241,6 +241,25 @@ def test_project_session_chat_json_shape():
     assert chat['chat']['files'] == [] and chat['meta'] == {} and chat['folder_id'] is None
 
 
+def test_projection_default_model_not_hardcoded():
+    """DA-3 P2-1 红测:行回补投影不得硬编码具体模型 id——引擎行不带模型信息
+    (assistantText data 只有 text/status),硬编码 'glm-5.3-flash' 与引擎档位
+    配置隐式耦合:配置漂移后展示位漂移,且 chat.models 回填 selectedModels
+    续轮带死模型 id 撞引擎 404。空串=诚实缺省(前端 loadChat 过滤 [''] 回落
+    用户默认;引擎侧空 model 回落空间默认→tier,语义=引擎自决)。"""
+    assert ba.DEFAULT_MODEL_ID == ''
+    chat = ba.project_session(
+        {'id': 'sess_x', 'title': 't', 'created_at': 1.0, 'updated_at': 1.0,
+         'pinned': False, 'archived': False},
+        _turn_rows(),
+        user_id='u1',
+    )
+    assert chat['chat']['models'] == ['']
+    assistant = chat['chat']['messages'][-1]
+    assert assistant['role'] == 'assistant'
+    assert assistant['model'] == '' and assistant['modelName'] == ''
+
+
 # ── create / get / save no-op / update / delete ─
 
 

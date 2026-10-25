@@ -49,8 +49,16 @@ log = logging.getLogger(__name__)
 ENGINE_CHAT_PREFIX = 'sess_'
 #: 引擎 API 轻量调用超时(秒)
 _API_TIMEOUT = 10.0
-#: 行回补投影的缺省模型 id(v3:仅展示位;新轮的 model 由请求携带=空间模型)
-DEFAULT_MODEL_ID = 'glm-5.3-flash'
+#: 行回补投影的缺省模型 id。空串=诚实缺省(DA-3 P2-1):引擎行不带模型信息
+#: (assistantText data 只有 text/status,引擎侧已核实),请求上下文在投影时也
+#: 不可得,"按行内 tier 映射/从请求上下文取"两条路都无数据源。硬编码具体 id
+#: ('glm-5.3-flash')与引擎档位配置隐式耦合——配置漂移后展示位静默漂移,且
+#: chat.models 原样回填 selectedModels 续轮会带死模型 id 撞引擎 404。
+#: 空串行为:message.model/modelName 仅展示位(前端 $models 匹配不上显示空,
+#: 不再显示错的);loadChat 对 [''] 会过滤并经 normalizeSelectedModels 回落
+#: 用户默认模型;引擎侧 body model 空串回落 spec.model(空间默认)→tier 兜底,
+#: 语义即"引擎自决"。
+DEFAULT_MODEL_ID = ''
 #: 行全量回补的单页上限(引擎 /api/sessions/{id}/rows 的 limit 夹在 1..200)
 _ROWS_PAGE = 200
 #: 行回补页数上限(200×100=2 万行)——单机会话远达不到,防御引擎异常时兜底退出
