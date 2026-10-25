@@ -1,7 +1,7 @@
 <script lang="ts">
 	// /workspaces — v3 工作空间(设计-工作空间v1):空间=主Agent+地盘+能力包(+预发通道)。
 	// 正本两层:主仓 workspaces/(内置)∪ ~/.banyan/workspaces/(自建);引擎热载直读。
-	// 页面即视图,Chat 即编辑器:自建空间在其会话里说人话即可改;内置空间在自举空间改。
+	// 页面即视图,Chat 即编辑器:自建空间在其会话里说人话即可改;内置空间在气根空间改。
 	import { onMount } from 'svelte';
 	import { showSidebar } from '$lib/stores';
 	import { getBanyanWorkspaces, type BanyanWorkspace } from '$lib/apis/banyan';
@@ -141,7 +141,7 @@
 							{#if tab === 'agent'}
 								<div class="text-[11px] text-gray-400 mb-2">
 									AGENT.md(该空间每个新会话的系统提示词;model={detail.agent.model || '(随档位)'} · tier={detail.agent.tier})。
-									{detail.builtin ? '内置空间:在自举空间里 Chat 修改(=改主仓)。' : '自建空间:在其会话里 Chat 修改。'}
+									{detail.builtin ? '内置空间:在气根空间里 Chat 修改(=改主仓)。' : '自建空间:在其会话里 Chat 修改。'}
 								</div>
 								<pre class="text-xs leading-relaxed whitespace-pre-wrap text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 max-h-96 overflow-y-auto">{detail.agent_prompt}</pre>
 							{:else if tab === 'roots'}
