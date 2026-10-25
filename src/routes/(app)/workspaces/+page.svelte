@@ -121,7 +121,10 @@
 				<!-- RF1-D:坏配置空间(id → 错误摘要) -->
 				<div class="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-4 text-sm text-red-600 dark:text-red-400 mb-6">
 					{#each Object.entries(registryErrors) as [id, err] (id)}
-						<div>坏空间 {id}:{err.slice(0, 80)}</div>
+						<!-- _layer_ 哨兵键=层目录整体不可读(RF3a-2),不是空间 id -->
+						<div>
+							{id.startsWith('_layer_') ? '工作空间层目录不可读' : `坏空间 ${id}`}:{err.slice(0, 80)}
+						</div>
 					{/each}
 				</div>
 			{/if}
