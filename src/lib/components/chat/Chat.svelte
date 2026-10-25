@@ -2652,37 +2652,37 @@
 			selectedModels = selectedModels.filter((modelId) =>
 				$models.map((m) => m.id).includes(modelId)
 			);
+		} else {
+			pendingWorkspaceModel = '';
+			if ($selectedFolder) {
+				// Folder defaults are explicit; never inherit a previous chat's selection.
+				selectedModels = normalizeSelectedModels($selectedFolder.data?.model_ids ?? []);
 			} else {
-				pendingWorkspaceModel = '';
-				if ($selectedFolder) {
-					// Folder defaults are explicit; never inherit a previous chat's selection.
-					selectedModels = normalizeSelectedModels($selectedFolder.data?.model_ids ?? []);
+				if (sessionStorage.selectedModels) {
+					// Set from session storage (temporary selection)
+					selectedModels = JSON.parse(sessionStorage.selectedModels);
+					sessionStorage.removeItem('selectedModels');
 				} else {
-					if (sessionStorage.selectedModels) {
-						// Set from session storage (temporary selection)
-						selectedModels = JSON.parse(sessionStorage.selectedModels);
-						sessionStorage.removeItem('selectedModels');
-					} else {
-						if (
-							$currentWorkspace?.model &&
-							(availableModels.includes($currentWorkspace.model) ||
-								availableModels.length === 0)
-						) {
-							// v3.1:空间默认模型(可换——模型与空间正交,默认仅是缺省)。
-							// P2-3:列表未到(空快照)同样先采用空间默认并挂起,
-							// 待列表到达后由响应式补设校验(不在目录则回落用户默认)。
-							selectedModels = [$currentWorkspace.model];
-							pendingWorkspaceModel =
-								availableModels.length === 0 ? $currentWorkspace.model : '';
-						} else if ($settings?.models) {
-							// Set from user settings
-							selectedModels = $settings?.models;
-						} else if (defaultModels && defaultModels.length > 0) {
-							// Set from default models
-							selectedModels = defaultModels;
-						}
+					if (
+						$currentWorkspace?.model &&
+						(availableModels.includes($currentWorkspace.model) ||
+							availableModels.length === 0)
+					) {
+						// v3.1:空间默认模型(可换——模型与空间正交,默认仅是缺省)。
+						// P2-3:列表未到(空快照)同样先采用空间默认并挂起,
+						// 待列表到达后由响应式补设校验(不在目录则回落用户默认)。
+						selectedModels = [$currentWorkspace.model];
+						pendingWorkspaceModel =
+							availableModels.length === 0 ? $currentWorkspace.model : '';
+					} else if ($settings?.models) {
+						// Set from user settings
+						selectedModels = $settings?.models;
+					} else if (defaultModels && defaultModels.length > 0) {
+						// Set from default models
+						selectedModels = defaultModels;
 					}
 				}
+			}
 
 			// Unavailable & hidden models filtering
 			selectedModels = normalizeSelectedModels(selectedModels);

@@ -478,7 +478,6 @@
 
 	const initChatList = async () => {
 		// Reset pagination variables
-		console.log('initChatList');
 		chatListReady = false;
 
 		await Promise.all([

@@ -76,7 +76,6 @@ from open_webui.tools.builtin import (
     query_knowledge_files,
     read_memory_path,
     replace_memory_content,
-    replace_note_content,
     search_calendar_events,
     search_channel_messages,
     search_channels,
@@ -84,7 +83,6 @@ from open_webui.tools.builtin import (
     search_knowledge_bases,
     search_knowledge_files,
     search_memories,
-    search_notes,
     search_web,
     timer,
     toggle_automation,
@@ -103,7 +101,6 @@ from open_webui.tools.builtin import (
     grep_skill_files,
     create_skill,
     update_skill_files,
-    write_note,
 )
 from open_webui.utils.access_control import has_access, has_connection_access, has_permission
 from open_webui.utils.chat_id import is_saved_chat_id, is_temporary_chat_id

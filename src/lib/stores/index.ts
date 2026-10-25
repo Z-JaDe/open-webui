@@ -337,9 +337,9 @@ type Settings = {
 	renderMarkdownInUserMessages?: boolean;
 	renderMarkdownInAssistantMessages?: boolean;
 	recentEmojis?: string[];
-		pinnedMenuItems?: string[];
+	pinnedMenuItems?: string[];
 
-		defaultUploadContext?: 'full' | 'focused';
+	defaultUploadContext?: 'full' | 'focused';
 
 	system?: string;
 	seed?: number;
