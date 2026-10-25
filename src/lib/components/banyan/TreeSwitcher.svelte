@@ -5,8 +5,8 @@
 	  输入 BanyanBranchEvent（同一消息块只保留最新一份）：
 	    { type:'branch', branches:[{id, label, active}], ts? }
 	  渲染：分支 pills，挂在消息块顶端；active 分支高亮；
-	  点击 pill → dispatch 'switch'（聊天内仅切换活动分支视图，引擎回投影线性消息流；
-	  全功能树操作在 /tree/[chatId] 页）。
+	  点击 pill → dispatch 'switch'（聊天内切换活动分支视图，引擎回投影线性
+	  消息流——v2 /tree/[chatId] 会话树页已删，分支操作即此，别处无指针）。
 
 	mock：`<TreeSwitcher mock />` 渲染内置样例分支。
 -->

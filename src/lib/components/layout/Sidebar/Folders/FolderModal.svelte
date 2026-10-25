@@ -273,8 +273,7 @@
 						</div>
 					{/if}
 
-					<div class="my-2">
-							</div>
+					<!-- F11:知识绑定块删除后的空 div 残块已删 -->
 
 					<div class="flex justify-end pt-3 text-sm font-normal gap-1.5">
 						<button

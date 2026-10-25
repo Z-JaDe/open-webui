@@ -1,6 +1,6 @@
 <script lang="ts">
 	// banyan 任务工作台共享布局（钩点③，统一设计 §6.1 / §8 G3+G5）
-	// 五路由：/registry /cards /audit /waves/[planId] /tree/[chatId]
+	// 现状路由：/cal /inbox(v2 波次五路由 /registry /cards /audit /waves /tree 已连根删除)
 	// 数据源统一 /banyan/api/*（fork 后端代理桥 → 引擎）。
 	// story 开关：URL 加 ?mock=1 → 各页用内置 mock 数据，不请求引擎。
 	import { getContext, setContext } from 'svelte';

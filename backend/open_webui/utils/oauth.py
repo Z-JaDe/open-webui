@@ -1894,7 +1894,14 @@ class OAuthManager:
 
     @staticmethod
     def _banyan_app_handoff_page(token: str) -> str:
-        """桌面 App OAuth 完成页:经 banyan:// deep-link 把 JWT 送回 App(替代轮询桥)。"""
+        """桌面 App OAuth 完成页:经 banyan:// deep-link 把 JWT 送回 App(替代轮询桥)。
+
+        工程权衡留痕(DA-2 未覆盖域补注):token 走 `banyan://auth?token=` query
+        而非 fragment——custom scheme 的 OS 事件面(浏览器历史/进程启动参数/
+        系统日志)多数只可靠透传 query,fragment 在部分 custom-scheme 链路上
+        会被浏览器/OS 剥掉,单机单人桌面场景下选了可达性。已知残留面:token
+        因此进入 URL/OS 事件面(本机可见);重估扳机=出现多用户共享设备场景,
+        届时应换 one-time code 交换(桌面 App 本地起 loopback listener 换真 token)。"""
         deep_link = f'banyan://auth?token={token}'
         return (
             '<!doctype html><html><head><meta charset="utf-8"><title>banyan 登录成功</title>'
