@@ -1734,26 +1734,3 @@ async def token_exchange(
         )
 
     return await create_signin_response(request, user, db, source='oauth')
-
-
-# ── Desktop App OAuth Bridge ──────────────────────────────────────
-# App 打开浏览器登录后,前端把 JWT 存到这里;App 轮询取走注入 webview。
-import time as _time
-_bridge_tokens: dict = {}  # bridge_id -> {token, ts}
-
-@router.post('/bridge/{bridge_id}/deposit')
-async def deposit_bridge_token(bridge_id: str, request: Request):
-    """Browser deposits JWT after successful OAuth login (called by frontend)."""
-    token = request.headers.get('Authorization', '').replace('Bearer ', '')
-    if not token:
-        raise HTTPException(400, 'Missing Bearer token')
-    _bridge_tokens[bridge_id] = {'token': token, 'ts': _time.time()}
-    return {'ok': True}
-
-@router.get('/bridge/{bridge_id}')
-async def get_bridge_token(bridge_id: str):
-    """Desktop App polls this to pick up the JWT after browser OAuth."""
-    entry = _bridge_tokens.get(bridge_id)
-    if entry and _time.time() - entry['ts'] < 300:
-        return {'token': entry['token']}
-    return {'token': None}

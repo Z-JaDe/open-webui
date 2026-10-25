@@ -18,7 +18,6 @@
 		type BanyanInboxCategory,
 		type BanyanInboxUnread
 	} from '$lib/apis/banyan';
-	import BanyanPageNav from '$lib/components/banyan/BanyanPageNav.svelte';
 	import { subscribeBanyanEvents, createBanyanRefresher } from '$lib/stores/banyanEvents';
 	import Check from '$lib/components/icons/Check.svelte';
 	import XMark from '$lib/components/icons/XMark.svelte';
@@ -236,7 +235,6 @@
 
 <svelte:head><title>信箱 · banyan</title></svelte:head>
 
-<BanyanPageNav />
 
 <div class="px-8 lg:px-28 xl:px-40 pb-16 pt-3 space-y-5">
 	{#if error}

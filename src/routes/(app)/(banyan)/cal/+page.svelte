@@ -19,7 +19,6 @@
 	} from '$lib/apis/banyan';
 	import type { CalendarEventModel, CalendarModel } from '$lib/apis/calendar';
 	import CalendarView from '$lib/components/calendar/CalendarView.svelte';
-	import BanyanPageNav from '$lib/components/banyan/BanyanPageNav.svelte';
 	import { subscribeBanyanEvents, createBanyanRefresher } from '$lib/stores/banyanEvents';
 
 	const i18n = getContext<Writable<i18nType>>('i18n');
@@ -292,7 +291,6 @@
 
 <svelte:head><title>日历 · banyan</title></svelte:head>
 
-<BanyanPageNav />
 
 <div class="px-8 lg:px-28 xl:px-40 pb-10 pt-3">
 	{#if error}

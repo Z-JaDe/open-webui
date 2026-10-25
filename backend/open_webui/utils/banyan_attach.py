@@ -27,7 +27,7 @@ import logging
 
 log = logging.getLogger(__name__)
 
-#: 引擎档位模型 id 前缀(banyan-duty / banyan-fast;v1_api.TIER_ALIASES 同源)
+#: 引擎模型 id 前缀(v3:model=工作空间,banyan-<空间id>;旧档位条目已退役)
 BANYAN_MODEL_PREFIX = 'banyan-'
 #: 附件行块头(追加在最后一条 user 文本尾部;引擎 _last_user_text 整串入会话行)
 ATTACHMENT_NOTE_HEADER = '\n\n[附件已存引擎工作区]'
@@ -59,7 +59,7 @@ def is_banyan_model(model: dict | None, body_model: str = '') -> bool:
         meta = ((model or {}).get('info') or {}).get('meta') or {}
     except Exception:
         return False
-    return isinstance(meta, dict) and meta.get('kind') == 'tier'
+    return isinstance(meta, dict) and meta.get('kind') in ('tier', 'space')
 
 
 # ── D18:多模态剥离 + 附件行携带 ──

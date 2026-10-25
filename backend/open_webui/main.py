@@ -892,6 +892,13 @@ app.include_router(retrieval.router, prefix='/api/v1/retrieval', tags=['retrieva
 
 app.include_router(configs.router, prefix='/api/v1/configs', tags=['configs'])
 
+@app.get('/auth/clear-session')
+async def clear_oauth_session():
+    from starlette.responses import RedirectResponse
+    resp = RedirectResponse(url='/auth', status_code=302)
+    resp.delete_cookie('owui-session')
+    return resp
+
 app.include_router(auths.router, prefix='/api/v1/auths', tags=['auths'])
 app.include_router(mfa.router, prefix='/api/v1/auths/mfa', tags=['auths'])
 app.include_router(users.router, prefix='/api/v1/users', tags=['users'])
@@ -2819,6 +2826,7 @@ try:
         app.add_middleware(
             StarSessionsMiddleware,
             store=redis_session_store,
+            max_age=3600,
             cookie_name='owui-session',
             cookie_same_site=WEBUI_SESSION_COOKIE_SAME_SITE,
             cookie_https_only=WEBUI_SESSION_COOKIE_SECURE,

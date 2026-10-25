@@ -230,20 +230,6 @@
 			onboarding = $config?.onboarding ?? false;
 		}
 	});
-
-
-	// Desktop App Bridge:把 URL 里的 bridge_id 存到 localStorage,全局 layout 会处理
-	// 如果来自桌面 App(有 bridge 参数),自动触发 GitHub OAuth
-	$: {
-		const bid = $page?.url?.searchParams?.get('bridge');
-		if (bid) {
-			localStorage.setItem('banyan_bridge_id', bid);
-			// 自动点 GitHub 登录(用户不用手动点)
-			setTimeout(() => {
-				window.location.href = '/oauth/github/login';
-			}, 100);
-		}
-	}
 </script>
 
 <svelte:head>

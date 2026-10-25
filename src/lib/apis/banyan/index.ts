@@ -856,6 +856,88 @@ export const getBanyanGoalConvs = async (
 	return res.json();
 };
 
+// v3 goal 人审卡(goal 内核 awaitHumanCard 开出的卡;引擎薄代理 pi-goal /cards)。
+export type BanyanGoalCard = {
+	cardId: string;
+	goalId: string;
+	question: string;
+	status: 'open' | 'approved' | 'rejected';
+	createdAt: number;
+};
+
+export const getBanyanGoalCards = async (
+	token: string = localStorage.token
+): Promise<BanyanGoalCard[]> => {
+	const res = await fetch(`${BANYAN_API_BASE_URL}/goals/cards`, {
+		method: 'GET',
+		headers: { Authorization: `Bearer ${token}` }
+	});
+	if (!res.ok) throw new Error(await res.text());
+	return (await res.json()).cards ?? [];
+};
+
+export const resolveBanyanGoalCard = async (
+	cardId: string,
+	decision: 'approved' | 'rejected',
+	note?: string,
+	token: string = localStorage.token
+): Promise<unknown> => {
+	const res = await fetch(
+		`${BANYAN_API_BASE_URL}/goals/cards/${encodeURIComponent(cardId)}/resolve`,
+		{
+			method: 'POST',
+			headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+			body: JSON.stringify({ decision, note: note ?? null })
+		}
+	);
+	if (!res.ok) throw new Error(await res.text());
+	return res.json();
+};
+
+// ── v3 工作空间(设计-工作空间v1):两层注册表(主仓内置 ∪ ~/.banyan/workspaces 自建) ──
+export type BanyanWorkspace = {
+	id: string;
+	name: string;
+	description: string;
+	builtin: boolean;
+	model_id: string;
+	roots: string[];
+	skills: string[];
+	roles: string[];
+	tools: string[];
+	knowledge_scopes: string[];
+	goal_defaults: Record<string, unknown>;
+	agent: { model: string; tier: string };
+	staging: boolean;
+	degraded: boolean;
+	error: string;
+	agent_prompt?: string;
+	staging_config?: Record<string, string>;
+};
+
+export const getBanyanWorkspaces = async (
+	token: string = localStorage.token
+): Promise<BanyanWorkspace[]> => {
+	const res = await fetch(`${BANYAN_API_BASE_URL}/workspaces`, {
+		method: 'GET',
+		headers: { Authorization: `Bearer ${token}` }
+	});
+	if (!res.ok) throw new Error(await res.text());
+	return (await res.json()).workspaces ?? [];
+};
+
+export const getBanyanWorkspace = async (
+	spaceId: string,
+	token: string = localStorage.token
+): Promise<BanyanWorkspace> => {
+	const res = await fetch(`${BANYAN_API_BASE_URL}/workspaces/${encodeURIComponent(spaceId)}`, {
+		method: 'GET',
+		headers: { Authorization: `Bearer ${token}` }
+	});
+	if (!res.ok) throw new Error(await res.text());
+	return (await res.json()).workspace;
+};
+
 export const getBanyanStatus = async (token: string = localStorage.token): Promise<BanyanEngineStatus> => {
 	const res = await fetch(`${BANYAN_API_BASE_URL}/status`, {
 		method: 'GET',

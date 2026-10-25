@@ -93,7 +93,7 @@ from open_webui.utils.auth import (
 from open_webui.utils.groups import apply_default_group_assignment
 from open_webui.utils.misc import parse_duration
 from open_webui.utils.validate import validate_image_url
-from starlette.responses import RedirectResponse
+from starlette.responses import HTMLResponse, RedirectResponse
 
 # Some IdPs put private params in ID token JOSE headers (CAS: client_id, CyberArk: app_id).
 # Authlib exposes no way to pass a registry, so relax it globally; crit, alg and signature checks still apply.
@@ -1892,6 +1892,22 @@ class OAuthManager:
             log.error(f"Error processing profile picture '{picture_url}': {e}")
             return '/user.png'
 
+    @staticmethod
+    def _banyan_app_handoff_page(token: str) -> str:
+        """桌面 App OAuth 完成页:经 banyan:// deep-link 把 JWT 送回 App(替代轮询桥)。"""
+        deep_link = f'banyan://auth?token={token}'
+        return (
+            '<!doctype html><html><head><meta charset="utf-8"><title>banyan 登录成功</title>'
+            '<style>body{font-family:-apple-system,system-ui,sans-serif;display:flex;min-height:100vh;'
+            'margin:0;align-items:center;justify-content:center;background:#0f172a;color:#e2e8f0}'
+            '.box{text-align:center}h1{font-size:22px;font-weight:600;margin:0 0 8px}p{color:#94a3b8}'
+            'a{color:#7dd3fc}</style></head><body><div class="box">'
+            '<h1>&#9989; 登录成功</h1><p>正在返回 banyan App&#8230;</p>'
+            f'<p><a href="{deep_link}">若没有自动返回，点这里</a></p>'
+            f'<script>setTimeout(function(){{location.href=\'{deep_link}\';}},300);</script>'
+            '</div></body></html>'
+        )
+
     async def handle_login(self, request, provider):
         auth_config = await get_oauth_runtime_config()
         if not auth_config.ENABLE_OAUTH:
@@ -1912,7 +1928,12 @@ class OAuthManager:
         if OAUTH_AUTHORIZE_PARAMS:
             kwargs.update(OAUTH_AUTHORIZE_PARAMS)
 
-        return await client.authorize_redirect(request, redirect_uri, **kwargs)
+        resp = await client.authorize_redirect(request, redirect_uri, **kwargs)
+        if request.query_params.get('app') == '1':
+            # 桌面 App 在系统浏览器发起的授权:留标记,回调后经 banyan:// deep-link 回传 JWT
+            resp.set_cookie('banyan_app_flow', '1', max_age=600, httponly=True,
+                            samesite='lax', path='/oauth')
+        return resp
 
     async def handle_callback(self, request, provider, response, db=None):
         auth_config = await get_oauth_runtime_config()
@@ -2304,6 +2325,15 @@ class OAuthManager:
                     secure=WEBUI_AUTH_COOKIE_SECURE,
                     **({'max_age': cookie_max_age} if cookie_max_age is not None else {}),
                 )
+
+        # 桌面 App 流:浏览器侧已完成授权,改发 banyan:// deep-link 把 JWT 直接送回 App
+        if request.cookies.get('banyan_app_flow') == '1' and not result.get('next_step'):
+            response.delete_cookie('banyan_app_flow', path='/oauth')
+            handoff = HTMLResponse(self._banyan_app_handoff_page(result['token']))
+            handoff.raw_headers.extend(
+                (k, v) for k, v in response.raw_headers if k.lower() != b'location'
+            )
+            return handoff
 
         return response
 

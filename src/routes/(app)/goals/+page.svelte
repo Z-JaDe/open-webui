@@ -3,9 +3,13 @@
 	// 转录含文本/思考/工具调用/工具结果全形态;子代理带 busy 状态。
 	import { onMount } from 'svelte';
 	import { showSidebar } from '$lib/stores';
+	import { toast } from 'svelte-sonner';
 	import {
+		getBanyanGoalCards,
 		getBanyanGoalConvs,
 		getBanyanGoals,
+		resolveBanyanGoalCard,
+		type BanyanGoalCard,
 		type BanyanGoalConvs,
 		type BanyanGoalEntry
 	} from '$lib/apis/banyan';
@@ -22,6 +26,8 @@
 	let loaded = false;
 	let error = '';
 	let goals: BanyanGoalEntry[] = [];
+	let openCards: BanyanGoalCard[] = [];
+	let resolvingCard = '';
 	let selected = '';
 	let convs: BanyanGoalConvs | null = null;
 	let convsLoading = false;
@@ -46,6 +52,27 @@
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 		}
+		// goal 人审卡:卡开着 = 有 goal 正阻塞等人裁决,这是本页最要紧的信号
+		try {
+			openCards = await getBanyanGoalCards();
+		} catch {
+			openCards = [];
+		}
+	}
+
+	const goalObjective = (goalId: string) =>
+		goals.find((g) => g.goalId === goalId)?.objective ?? goalId;
+
+	async function decide(card: BanyanGoalCard, decision: 'approved' | 'rejected') {
+		resolvingCard = card.cardId;
+		try {
+			await resolveBanyanGoalCard(card.cardId, decision);
+			toast.success(decision === 'approved' ? '已批准,goal 继续执行' : '已驳回');
+			await refresh();
+		} catch (e) {
+			toast.error(e instanceof Error ? e.message : String(e));
+		}
+		resolvingCard = '';
 	}
 
 	async function select(goalId: string) {
@@ -126,6 +153,48 @@
 			{#if error}
 				<div class="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-4 text-sm text-red-600 dark:text-red-400">
 					引擎不可达:{error}
+				</div>
+			{/if}
+
+			{#if openCards.length > 0}
+				<!-- goal 人审卡:有 goal 阻塞在等人决定——批=继续,驳=终止/失败 -->
+				<div class="mb-6 rounded-xl border border-amber-300/60 dark:border-amber-600/40 bg-amber-50 dark:bg-amber-950/20 p-4 space-y-3">
+					<div class="text-sm font-semibold text-amber-700 dark:text-amber-400">
+						需要你的裁决({openCards.length})——相关 goal 正在等这个决定才能继续
+					</div>
+					{#each openCards as card (card.cardId)}
+						<div class="rounded-lg bg-white/70 dark:bg-gray-900/60 border border-amber-200/50 dark:border-amber-800/30 p-3 space-y-2">
+							<button
+								class="text-left text-xs text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+								on:click={() => select(card.goalId)}
+							>
+								来自 goal: <span class="font-mono">{goalObjective(card.goalId).slice(0, 60)}</span>
+								{#if goals.find((g) => g.goalId === card.goalId)}
+									<span class="underline">· 查看会话</span>
+								{/if}
+							</button>
+							<div class="text-sm text-gray-800 dark:text-gray-100 whitespace-pre-wrap leading-relaxed">{card.question}</div>
+							<div class="flex items-center gap-2">
+								<button
+									class="px-3 py-1.5 text-xs font-medium rounded-lg bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black disabled:opacity-50 transition"
+									disabled={resolvingCard === card.cardId}
+									on:click={() => decide(card, 'approved')}
+								>
+									批准
+								</button>
+								<button
+									class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 transition"
+									disabled={resolvingCard === card.cardId}
+									on:click={() => decide(card, 'rejected')}
+								>
+									驳回
+								</button>
+								<span class="text-[10px] text-gray-400">
+									{card.createdAt ? new Date(card.createdAt).toLocaleString() : ''}
+								</span>
+							</div>
+						</div>
+					{/each}
 				</div>
 			{/if}
 

@@ -12,6 +12,7 @@ export const isBanyanTierModel = (
 	model?: { id?: string; meta?: Record<string, unknown> } | null
 ): boolean => {
 	if (!model) return false;
-	if ((model as { meta?: Record<string, unknown> })?.meta?.kind === 'tier') return true;
+	const kind = (model as { meta?: Record<string, unknown> })?.meta?.kind;
+	if (kind === 'tier' || kind === 'space') return true;
 	return String(model?.id ?? '').startsWith('banyan-');
 };

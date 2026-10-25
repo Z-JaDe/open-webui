@@ -98,7 +98,7 @@
 	// /notes 路由本身不动(F14 封堵包归 RF-14');存量 settings.pinnedMenuItems 里
 	// 残留的 'notes' 由下方 pinnedItems 派生处一并过滤。
 	const BREAKPOINT = 768;
-	const DEFAULT_PINNED_ITEMS = ['workspace'];
+	const DEFAULT_PINNED_ITEMS = ['workspaces'];
 
 	let scrollTop = 0;
 
@@ -135,21 +135,18 @@
 
 	// banyan 任务分区入口（钩点③；WE-7 起含 /arch 架构页；v3 W2/W3 追加 inbox/cal 两行）
 	// v3 W2 信箱徽标数据源（import 与徽标逻辑一并登记在钩点③内）
-	import { getBanyanInbox } from '$lib/apis/banyan';
+	import { getBanyanGoalCards, getBanyanInbox } from '$lib/apis/banyan';
 	// F8/D15:K1 事件流订阅(信箱徽标事件驱动);F4/D10:decision 落箱 Web 通知
 	import { subscribeBanyanEvents, createBanyanRefresher } from '$lib/stores/banyanEvents';
 	import { notifyBanyanDecision } from '$lib/utils/banyanNotify';
 
+	// v3 精简(2026-10-25):goal 内核为正主,侧边栏只留活跃面(目标/信箱/日历/架构)。
+	// v2 波次面(登记簿/审卡/审计/方案/会话树)退役出导航——路由保留,URL 直达(归档)。
 	const banyanTaskEntries = [
-		{ id: 'registry', label: '登记簿', href: '/registry', prefix: '/registry' },
-		{ id: 'cards', label: '审卡', href: '/cards', prefix: '/cards' },
-		{ id: 'audit', label: '审计', href: '/audit', prefix: '/audit' },
-		{ id: 'waves', label: '方案', href: '/waves', prefix: '/waves' },
-		{ id: 'tree', label: '会话树', href: '/tree', prefix: '/tree' },
-		{ id: 'arch', label: '架构', href: '/arch', prefix: '/arch' },
 		{ id: 'goals', label: 'Goal 会话', href: '/goals', prefix: '/goals' },
 		{ id: 'inbox', label: '信箱', href: '/inbox', prefix: '/inbox' },
-		{ id: 'cal', label: '日历', href: '/cal', prefix: '/cal' }
+		{ id: 'cal', label: '日历', href: '/cal', prefix: '/cal' },
+		{ id: 'arch', label: '架构', href: '/arch', prefix: '/arch' }
 	];
 
 	// v3 W2（V-10）：信箱条目挂待裁决数徽标。D15/F8 起事件驱动：inbox.* 帧到达即重取，
@@ -165,8 +162,22 @@
 			banyanInboxPending = 0;
 		}
 	};
+
+	// v3:goal 人审卡徽标——有卡待裁时 goal 任务在阻塞等你的决定,这是最该被看见的信号。
+	let banyanGoalCardsPending = 0;
+	const refreshBanyanGoalCardsPending = async () => {
+		try {
+			const cards = await getBanyanGoalCards();
+			banyanGoalCardsPending = cards.length;
+		} catch {
+			banyanGoalCardsPending = 0;
+		}
+	};
 	onMount(() => {
 		refreshBanyanInboxPending();
+		// goal 人卡无事件流,30s 轻量轮询徽标(goal 卡出现=任务在阻塞等人)
+		refreshBanyanGoalCardsPending();
+		const goalCardsTimer = setInterval(refreshBanyanGoalCardsPending, 30000);
 		// 徽标轻量(单 GET),不设 focus 门;1s 窗口吸收事件连发
 		const refresher = createBanyanRefresher(refreshBanyanInboxPending, {
 			minIntervalMs: 1000,
@@ -185,6 +196,7 @@
 		return () => {
 			unsubscribe();
 			refresher.dispose();
+			clearInterval(goalCardsTimer);
 		};
 	});
 
@@ -229,15 +241,8 @@
 					($config?.features?.enable_notes ?? false) &&
 					($user?.role === 'admin' || ($user?.permissions?.features?.notes ?? true))
 				);
-			case 'workspace':
-				return (
-					$user?.role === 'admin' ||
-					$user?.permissions?.workspace?.models ||
-					$user?.permissions?.workspace?.knowledge ||
-					$user?.permissions?.workspace?.prompts ||
-					$user?.permissions?.workspace?.tools ||
-					$user?.permissions?.workspace?.skills
-				);
+			case 'workspaces':
+				return true;   // v3 工作空间=引擎空间注册表,登录即可见
 			case 'automations':
 				return (
 					$config?.features?.enable_automations &&
@@ -258,7 +263,7 @@
 	const getMenuItemMeta = (id) => {
 		const items = {
 			notes: { label: $i18n.t('Notes'), href: '/notes', iconType: 'note' },
-			workspace: { label: $i18n.t('Workspace'), href: '/workspace', iconType: 'workspace' },
+			workspaces: { label: $i18n.t('工作空间'), href: '/workspaces', iconType: 'workspace' },
 			automations: { label: $i18n.t('Automations'), href: '/automations', iconType: 'automations' },
 			calendar: { label: $i18n.t('Calendar'), href: '/calendar', iconType: 'calendar' },
 			playground: { label: $i18n.t('Playground'), href: '/playground', iconType: 'playground' }
@@ -268,7 +273,8 @@
 
 	const menuItemPathPrefixes = {
 		notes: '/notes',
-		workspace: '/workspace',
+		workspaces: '/workspaces',
+		workspace: '/workspaces',   // 旧前缀归并到新空间页
 		calendar: '/calendar',
 		automations: '/automations',
 		playground: '/playground'
@@ -1460,8 +1466,14 @@
 										{$i18n.t(entry.label)}
 									</div>
 								</div>
-								<!-- v3 W2（V-10）：信箱条目待裁决徽标 -->
-								{#if entry.id === 'inbox' && banyanInboxPending > 0}
+								<!-- v3 W2（V-10）：信箱条目待裁决徽标;v3 追加 goal 人卡徽标 -->
+								{#if entry.id === 'goals' && banyanGoalCardsPending > 0}
+									<span
+										class="ml-auto self-center inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full text-[10px] font-semibold bg-amber-500 text-white"
+									>
+										{banyanGoalCardsPending}
+									</span>
+								{:else if entry.id === 'inbox' && banyanInboxPending > 0}
 									<span
 										class="ml-auto self-center inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full text-[10px] font-semibold bg-blue-500 text-white"
 									>
