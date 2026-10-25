@@ -170,7 +170,6 @@ from open_webui.routers import (
     memories,
     mfa,
     models,
-    notes,
     notifications,
     ollama,
     openai,
@@ -907,7 +906,6 @@ app.include_router(users.router, prefix='/api/v1/users', tags=['users'])
 app.include_router(apps.router, prefix='/api/v1/apps', tags=['apps'])
 app.include_router(channels.router, prefix='/api/v1/channels', tags=['channels'])
 app.include_router(chats.router, prefix='/api/v1/chats', tags=['chats'])
-app.include_router(notes.router, prefix='/api/v1/notes', tags=['notes'])
 
 
 app.include_router(models.router, prefix='/api/v1/models', tags=['models'])
@@ -2424,7 +2422,6 @@ async def get_app_config(request: Request):
         'apps.enable',
         'calendar.enable',
         'automations.enable',
-        'notes.enable',
         'chat.context_compaction.enable',
         'chat.tool_permissions.enable',
         'web.search.enable',
@@ -2520,7 +2517,6 @@ async def get_app_config(request: Request):
                     'enable_apps': config.get('apps.enable'),
                     'enable_calendar': config.get('calendar.enable'),
                     'enable_automations': config.get('automations.enable'),
-                    'enable_notes': config.get('notes.enable'),
                     'enable_context_compaction': config.get('chat.context_compaction.enable'),
                     'enable_tool_permissions': config.get('chat.tool_permissions.enable'),
                     'enable_web_search': config.get('web.search.enable'),

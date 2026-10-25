@@ -16,7 +16,6 @@
 		showSearch,
 		mobile,
 		pinnedChats,
-		pinnedNotes,
 		temporaryChatEnabled,
 		channels,
 		socket,
@@ -58,9 +57,7 @@
 		getSharedFolders,
 		updateFolderParentIdById
 	} from '$lib/apis/folders';
-	import { createNewNote, getPinnedNoteList, toggleNotePinnedStatusById } from '$lib/apis/notes';
-	import { updateUserSettings } from '$lib/apis/users';
-	import { createNoteHandler } from '$lib/components/notes/utils';
+		import { updateUserSettings } from '$lib/apis/users';
 	import { WEBUI_API_BASE_URL, WEBUI_BASE_URL } from '$lib/constants';
 
 	import UserMenu from './Sidebar/UserMenu.svelte';
@@ -78,13 +75,11 @@
 	import SearchModal from './SearchModal.svelte';
 	import FolderModal from './Sidebar/Folders/FolderModal.svelte';
 	import PinnedModelList from './Sidebar/PinnedModelList.svelte';
-	import PinnedNoteList from './Sidebar/PinnedNoteList.svelte';
-	import CalendarIcon from './Sidebar/icons/Calendar.svelte';
+		import CalendarIcon from './Sidebar/icons/Calendar.svelte';
 	import ClockIcon from './Sidebar/icons/Clock.svelte';
 	import CodeIcon from './Sidebar/icons/Code.svelte';
 	import EditPencilIcon from './Sidebar/icons/EditPencil.svelte';
-	import NotesIcon from './Sidebar/icons/Notes.svelte';
-	import SearchIcon from './Sidebar/icons/Search.svelte';
+		import SearchIcon from './Sidebar/icons/Search.svelte';
 	import Sidebar from '../icons/Sidebar.svelte';
 	import WorkspaceIcon from './Sidebar/icons/Workspace.svelte';
 	import HotkeyHint from '../common/HotkeyHint.svelte';
@@ -126,7 +121,6 @@
 	let showCreateFolderModal = false;
 
 	let showPinnedModels = true;
-	let showPinnedNotes = false;
 	let showChannels = false;
 	let showFolders = false;
 	let showSharedFolders = false;
@@ -262,7 +256,6 @@
 
 	const getMenuItemMeta = (id) => {
 		const items = {
-			notes: { label: $i18n.t('Notes'), href: '/notes', iconType: 'note' },
 			workspaces: { label: $i18n.t('工作空间'), href: '/workspaces', iconType: 'workspace' },
 			automations: { label: $i18n.t('Automations'), href: '/automations', iconType: 'automations' },
 			calendar: { label: $i18n.t('Calendar'), href: '/calendar', iconType: 'calendar' },
@@ -272,7 +265,6 @@
 	};
 
 	const menuItemPathPrefixes = {
-		notes: '/notes',
 		workspaces: '/workspaces',
 		workspace: '/workspaces',   // 旧前缀归并到新空间页
 		calendar: '/calendar',
@@ -467,8 +459,6 @@
 					($user?.role === 'admin' || ($user?.permissions?.features?.notes ?? true))
 				) {
 					console.log('Init pinned notes');
-					const _pinnedNotes = await getPinnedNoteList(localStorage.token).catch(() => []);
-					pinnedNotes.set(_pinnedNotes);
 				}
 			})(),
 			(async () => {
@@ -1389,24 +1379,7 @@
 						</SidebarSection>
 					{/if}
 
-					{#if ($config?.features?.enable_notes ?? false) && ($user?.role === 'admin' || ($user?.permissions?.features?.notes ?? true)) && $pinnedNotes.length > 0}
-						<SidebarSection
-							id="sidebar-pinned-notes"
-							bind:open={showPinnedNotes}
-							name={$i18n.t('Notes')}
-							dragAndDrop={false}
-							onAdd={async () => {
-								const note = await createNoteHandler('New Note');
-								if (note) {
-									goto(`/notes/${note.id}`);
-								}
-							}}
-							onAddLabel={$i18n.t('New Note')}
-						>
-							<PinnedNoteList bind:selectedChatId />
-						</SidebarSection>
-					{/if}
-
+	
 					{#if $config?.features?.enable_channels && ($user?.role === 'admin' || ($user?.permissions?.features?.channels ?? true))}
 						<SidebarSection
 							id="sidebar-channels"

@@ -7,7 +7,6 @@
 	import { getPromptById, updatePromptAccessGrants } from '$lib/apis/prompts';
 	import { getSkillById, updateSkillAccessGrants } from '$lib/apis/skills';
 	import { getToolById, updateToolAccessGrants } from '$lib/apis/tools';
-	import { getNoteById, updateNoteAccessGrants } from '$lib/apis/notes';
 	import AccessControlModal from './AccessControlModal.svelte';
 
 	export let resourceType: 'models' | 'knowledge' | 'prompts' | 'skills' | 'tools' | 'notes';
@@ -18,15 +17,13 @@
 		knowledge: getKnowledgeById,
 		prompts: getPromptById,
 		skills: getSkillById,
-		tools: getToolById,
-		notes: getNoteById
+		tools: getToolById
 	};
 	const savers = {
 		knowledge: updateKnowledgeAccessGrants,
 		prompts: updatePromptAccessGrants,
 		skills: updateSkillAccessGrants,
-		tools: updateToolAccessGrants,
-		notes: updateNoteAccessGrants
+		tools: updateToolAccessGrants
 	};
 	let show = false;
 	let saving = false;

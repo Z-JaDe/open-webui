@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount, onDestroy, getContext, createEventDispatcher, tick } from 'svelte';
-	import { searchNotes } from '$lib/apis/notes';
 	import { searchKnowledgeBases, searchKnowledgeFiles } from '$lib/apis/knowledge';
 
 	import { decodeString } from '$lib/utils';
@@ -51,23 +50,10 @@
 	});
 
 	const getItems = () => {
-		getNoteItems();
 		getKnowledgeItems();
 		getKnowledgeFileItems();
 	};
 
-	const getNoteItems = async () => {
-		const res = await searchNotes(localStorage.token, query).catch(() => {
-			return null;
-		});
-
-		if (res) {
-			noteItems = res.items.map((note) => {
-				return {
-					...note,
-					type: 'note',
-					name: note.title
-				};
 			});
 		}
 	};

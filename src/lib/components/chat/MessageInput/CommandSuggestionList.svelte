@@ -1,7 +1,6 @@
 <script lang="ts">
 	import SlashCommands from './Commands/SlashCommands.svelte';
 	import AtCommands from './Commands/AtCommands.svelte';
-	import Knowledge from './Commands/Knowledge.svelte';
 	import Skills from './Commands/Skills.svelte';
 	import Emojis from './Commands/Emojis.svelte';
 	import DropdownMenu from '$lib/components/common/DropdownMenu.svelte';
@@ -155,31 +154,6 @@
 
 							onSelect({
 								type: 'skill',
-								data: data
-							});
-						}
-					}}
-				/>
-			{:else if char === '#'}
-				<Knowledge
-					bind:this={suggestionElement}
-					{query}
-					bind:filteredItems
-					onSelect={(e) => {
-						const { type, data } = e;
-
-						if (type === 'knowledge') {
-							insertTextHandler('');
-
-							onUpload({
-								type: 'file',
-								data: data
-							});
-						} else if (type === 'web') {
-							insertTextHandler('');
-
-							onUpload({
-								type: 'web',
 								data: data
 							});
 						}

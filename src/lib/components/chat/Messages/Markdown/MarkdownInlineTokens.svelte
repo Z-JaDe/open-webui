@@ -19,7 +19,6 @@
 	import TextToken from './MarkdownInlineTokens/TextToken.svelte';
 	import CodespanToken from './MarkdownInlineTokens/CodespanToken.svelte';
 	import MentionToken from './MarkdownInlineTokens/MentionToken.svelte';
-	import NoteLinkToken from './MarkdownInlineTokens/NoteLinkToken.svelte';
 	import SourceToken from './SourceToken.svelte';
 
 	export let id: string;
@@ -28,23 +27,6 @@
 	export let sourceIds = [];
 	export let onSourceClick: Function = () => {};
 
-	/**
-	 * Check if a URL is a same-origin note link and return the note ID if so.
-	 */
-	const getNoteIdFromHref = (href: string): string | null => {
-		try {
-			const url = new URL(href, window.location.origin);
-			if (url.origin === window.location.origin) {
-				const match = url.pathname.match(/^\/notes\/([^/]+)$/);
-				if (match) {
-					return match[1];
-				}
-			}
-		} catch {
-			// Invalid URL
-		}
-		return null;
-	};
 
 	const getLinkToken = (token: Tokens.Link | Tokens.Generic) => {
 		const isAutolink = !token.raw.startsWith('[');
@@ -56,7 +38,6 @@
 			isAutolink,
 			href,
 			safeHref: safeLinkUrl(href),
-			noteId: getNoteIdFromHref(href),
 			text: isAutolink ? text : token.text
 		};
 	};
@@ -90,9 +71,7 @@
 		<HtmlToken {id} {token} {onSourceClick} />
 	{:else if token.type === 'link'}
 		{@const linkToken = getLinkToken(token)}
-		{#if linkToken.noteId}
-			<NoteLinkToken noteId={linkToken.noteId} href={linkToken.href} />
-		{:else if token.tokens && !linkToken.isAutolink}
+		{#if token.tokens && !linkToken.isAutolink}
 			<a
 				href={linkToken.safeHref}
 				target="_blank"
