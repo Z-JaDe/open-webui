@@ -13,8 +13,10 @@
 - **D20 记忆归引擎**:banyan 模型强制 ``features.memory=False``(第二人格记忆层
   封禁;middleware 在 features pop 后置 False)。
 
-banyan 模型判定:body model id 以 ``banyan-`` 前缀,或 model 条目
-``info.meta.kind == "tier"``(引擎 /v1/models 档位条目的标记)。
+banyan 模型判定(v3.1):model 条目顶层 ``meta.kind ∈ {tier, space, banyan}``
+(引擎 /v1/models 条目经 fork models 注册表原样透传,kind 停在顶层;
+``info.meta.kind`` 为 DB 建模模型兼容层),``banyan-`` id 前缀为 v3 前历史
+形态兜底(与 is_banyan_model 实现同步维护)。
 
 结构红线:全部判定与 payload 变换内聚本模块,middleware 只留三处一行接线;
 模块级 import 仅标准库(与 banyan_bridge.py 同款 importlib 直载测试模式),
@@ -27,7 +29,8 @@ import logging
 
 log = logging.getLogger(__name__)
 
-#: 引擎模型 id 前缀(v3:model=工作空间,banyan-<空间id>;旧档位条目已退役)
+#: 引擎模型 id 前缀兜底(v3.1 起引擎模型=真模型 id 无前缀,此形态仅历史数据
+#: 兼容;现行判定主力=顶层 meta.kind,见 is_banyan_model)
 BANYAN_MODEL_PREFIX = 'banyan-'
 #: 附件行块头(追加在最后一条 user 文本尾部;引擎 _last_user_text 整串入会话行)
 ATTACHMENT_NOTE_HEADER = '\n\n[附件已存引擎工作区]'
