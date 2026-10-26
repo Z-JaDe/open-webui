@@ -999,7 +999,8 @@ export type BanyanNodeRegisterResult = {
 	node_token: string;
 };
 
-/** 引擎列表载荷 → BanyanNodeInfo(裸数组为主,{nodes:[…]} 兜底;字段全防御) */
+/** 引擎列表载荷 → BanyanNodeInfo(F-10 协议口径:主路径 {nodes:[…]} 包装,
+ * 裸数组兜底保留;字段全防御) */
 export const listBanyanNodes = async (
 	token: string = localStorage.token
 ): Promise<BanyanNodeInfo[]> => {
@@ -1009,7 +1010,8 @@ export const listBanyanNodes = async (
 	});
 	if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
 	const raw: any = await res.json();
-	const rows = asArray(Array.isArray(raw) ? raw : raw?.nodes);
+	// F-10 协议口径:{nodes:[…]} 包装=主路径;裸数组(旧形状漂移)兜底保留
+	const rows = asArray(Array.isArray(raw?.nodes) ? raw.nodes : raw);
 	return rows.map(
 		(n: any): BanyanNodeInfo => ({
 			node_id: String(n?.node_id ?? n?.id ?? ''),
@@ -1056,6 +1058,52 @@ export const sendBanyanNodeCommand = async (
 	return { command_id: String(raw?.command_id ?? raw?.id ?? '') };
 };
 
+// ── RF-C3c F-3:指令历史读面(回执可见面)──
+// 引擎 GET /api/nodes/{id}/commands(管理面)→ {commands:[…]}(最近 50 条,
+// 新→旧);state 四态由引擎投影(pending|claimed|done|expired),result=首
+// 200 字摘要。/devices 节点卡「指令历史」区消费,30s 随列表刷新。
+export type BanyanNodeCommandState = 'pending' | 'claimed' | 'done' | 'expired';
+
+export type BanyanNodeCommandEntry = {
+	id: string;
+	kind: BanyanNodeCommandKind | string;
+	/** epoch ms(引擎给 epoch 秒,本层换算) */
+	created_at?: number;
+	claimed_at?: number;
+	done_at?: number;
+	state: BanyanNodeCommandState;
+	/** 回执摘要(首 200 字;pending/claimed 为空串) */
+	result: string;
+};
+
+export const listBanyanNodeCommands = async (
+	nodeId: string,
+	token: string = localStorage.token
+): Promise<BanyanNodeCommandEntry[]> => {
+	const res = await fetch(
+		`${BANYAN_API_BASE_URL}/nodes/${encodeURIComponent(nodeId)}/commands`,
+		{
+			method: 'GET',
+			headers: { Authorization: `Bearer ${token}` }
+		}
+	);
+	if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+	const raw: any = await res.json();
+	return asArray(Array.isArray(raw?.commands) ? raw.commands : raw).map(
+		(c: any): BanyanNodeCommandEntry => ({
+			id: String(c?.id ?? ''),
+			kind: String(c?.kind ?? ''),
+			created_at: toMs(c?.created_at),
+			claimed_at: toMs(c?.claimed_at),
+			done_at: toMs(c?.done_at),
+			state: (['pending', 'claimed', 'done', 'expired'].includes(c?.state)
+				? c.state
+				: 'pending') as BanyanNodeCommandState,
+			result: typeof c?.result === 'string' ? c.result : ''
+		})
+	);
+};
+
 /** DELETE /api/nodes/{id}(吊销该节点:node_tokens 删行,心跳即拒) */
 export const deleteBanyanNode = async (nodeId: string, token: string = localStorage.token) => {
 	return request('DELETE', `/nodes/${encodeURIComponent(nodeId)}`);
@@ -1096,9 +1144,41 @@ export const isNodeOnline = (
 	return now - lastHeartbeatMs < thresholdMs;
 };
 
+/** RF-C3c F-7:uptime 人化——<60s→「45s」,<3600→「59m 59s」,否则「2h 5m」
+ * (秒一律向下取整;坏值 undefined 不渲染) */
+export const formatNodeUptime = (seconds: number): string | undefined => {
+	if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds < 0) {
+		return undefined;
+	}
+	const s = Math.floor(seconds);
+	if (s < 60) return `${s}s`;
+	if (s < 3600) return `${Math.floor(s / 60)}m ${s % 60}s`;
+	return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
+};
+
+/** RF-C3c F-1:节点上报的空间目录(心跳 status.spaces,引擎 list_workspaces
+ * [{id,name}] 投影)→ chat_turn 面板可选下拉的选项;无/空/坏 → [](面板显示
+ * 「目标节点默认会话」)。缺 name 回退 id。 */
+export const nodeSpaces = (
+	status: unknown
+): Array<{ id: string; name: string }> => {
+	if (!status || typeof status !== 'object' || Array.isArray(status)) return [];
+	const raw = (status as Record<string, unknown>).spaces;
+	if (!Array.isArray(raw)) return [];
+	return raw
+		.filter((s): s is Record<string, unknown> => !!s && typeof s === 'object')
+		.map((s) => {
+			const id = String(s?.id ?? '').trim();
+			if (!id) return null;
+			return { id, name: String(s?.name ?? id) };
+		})
+		.filter((s): s is { id: string; name: string } => s !== null);
+};
+
 /** 宽松 status 载荷 → 页面摘要四键(版本/uptime/last_seq/goals 数)。
- * 引擎侧自由形状(RF-C3a 并行),已知键位逐个探测,坏值跳过不炸——
- * 空手而归时页面渲染「—」,不做第二套状态词汇。 */
+ * 引擎实况形状优先(RF-C3c F-2:goals=goals_digest.active_goals,引擎
+ * _status_snapshot 六键载荷的钉死键位),DA-2 想象形状兼容;坏值跳过不炸——
+ * 空手而归时页面渲染「—」,不做第二套状态词汇。uptime 数值人化(F-7)。 */
 export const nodeStatusSummary = (
 	status: unknown
 ): { version?: string; uptime?: string; last_seq?: number; goals?: number } => {
@@ -1109,6 +1189,9 @@ export const nodeStatusSummary = (
 		string,
 		unknown
 	>;
+	const goalsDigest = (s.goals_digest && typeof s.goals_digest === 'object'
+		? s.goals_digest
+		: {}) as Record<string, unknown>;
 	const counts = (s.counts && typeof s.counts === 'object' ? s.counts : {}) as Record<
 		string,
 		unknown
@@ -1116,14 +1199,25 @@ export const nodeStatusSummary = (
 	const ver = s.version ?? s.engine_version ?? engine.version;
 	if (ver !== undefined && ver !== null && String(ver) !== '') out.version = String(ver);
 	const up = s.uptime ?? s.uptime_s ?? engine.uptime;
-	if (up !== undefined && up !== null && String(up) !== '') out.uptime = String(up);
+	if (up !== undefined && up !== null && String(up) !== '') {
+		out.uptime =
+			typeof up === 'number' && Number.isFinite(up)
+				? formatNodeUptime(up)
+				: String(up);
+	}
 	for (const v of [s.last_seq, engine.last_seq]) {
 		if (typeof v === 'number' && Number.isFinite(v)) {
 			out.last_seq = v;
 			break;
 		}
 	}
-	for (const v of [s.goals, s.running_goals, counts.goals, counts.running_goals]) {
+	for (const v of [
+		goalsDigest.active_goals, // 引擎实况形状(F-2 修复点)
+		s.goals,
+		s.running_goals,
+		counts.goals,
+		counts.running_goals
+	]) {
 		if (typeof v === 'number' && Number.isFinite(v)) {
 			out.goals = v;
 			break;
