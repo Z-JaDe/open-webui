@@ -11,6 +11,7 @@ failure (no more fire-and-forget create_task).
 from __future__ import annotations
 
 import logging
+import os
 import time
 from typing import Any, ClassVar
 
@@ -97,6 +98,44 @@ def _json_value(value: Any) -> Any:
     return jsonable_encoder(value)
 
 
+# ── fork:进程内读缓存(远端 DATABASE_URL 的延迟防线)────────────────────────
+# 上游读路径每键一条 SELECT(无缓存):远端库时每请求 N 键 × RTT 被放大
+# (实测美东→杭州 250ms × 49 查询 = 12s)。本缓存把读压到内存;写路径全部
+# 穿透(upsert/delete/clear/rename/repair/seed 就地更新或整表失效);TTL
+# 兜底外部直改库的陈旧窗口。CONFIG_CACHE_TTL_S=0 关闭(回归上游行为)。
+_CACHE_TTL_S = float(os.getenv('CONFIG_CACHE_TTL_S', '30') or 0)
+_MEM: dict[str, tuple[Any, float]] = {}        # key → (value, expires_at)
+_MISS = object()
+
+
+def _cache_get(key: str):
+    if _CACHE_TTL_S <= 0:
+        return _MISS
+    ent = _MEM.get(key)
+    if ent is None:
+        return _MISS
+    value, exp = ent
+    if time.monotonic() >= exp:
+        _MEM.pop(key, None)
+        return _MISS
+    return value
+
+
+def _cache_put(key: str, value: Any) -> None:
+    if _CACHE_TTL_S <= 0:
+        return
+    _MEM[key] = (value, time.monotonic() + _CACHE_TTL_S)
+
+
+def _cache_drop(*keys: str) -> None:
+    for k in keys:
+        _MEM.pop(k, None)
+
+
+def _cache_clear() -> None:
+    _MEM.clear()
+
+
 # ── Model ────────────────────────────────────────────────────────────────────
 
 
@@ -144,9 +183,14 @@ class Config(Base):
         """Get a config value by key. Returns default if not set."""
         if not Config.persistent_enabled_for(key):
             return Config.default_value(key, default)
+        cached = _cache_get(key)
+        if cached is not _MISS:
+            return cached
         async with get_async_db() as db:
             row = await db.get(Config, key)
-            return row.value if row else Config.default_value(key, default)
+            value = row.value if row else Config.default_value(key, default)
+            _cache_put(key, value)      # 负结果也缓存(防不存在键反复打库)
+            return value
 
     @staticmethod
     async def get_many(*keys: str) -> dict:
@@ -159,14 +203,24 @@ class Config(Base):
         enabled_keys = {key for key in keys if Config.persistent_enabled_for(key)}
         if not enabled_keys:
             return disabled_values
-        async with get_async_db() as db:
-            result = await db.execute(select(Config).where(Config.key.in_(enabled_keys)))
-            values = {row.key: row.value for row in result.scalars().all()}
-            return {
-                key: values.get(key, Config.default_value(key))
-                for key in keys
-                if key in values or key in Config.DEFAULTS or key in disabled_values
-            }
+        out: dict[str, Any] = {}
+        miss: list[str] = []
+        for key in enabled_keys:
+            cached = _cache_get(key)
+            if cached is not _MISS:
+                out[key] = cached
+            else:
+                miss.append(key)
+        if miss:
+            async with get_async_db() as db:
+                result = await db.execute(select(Config).where(Config.key.in_(miss)))
+                values = {row.key: row.value for row in result.scalars().all()}
+            for key in miss:
+                value = values.get(key, Config.default_value(key))
+                _cache_put(key, value)
+                if key in values or key in Config.DEFAULTS:
+                    out[key] = value
+        return out
 
     @staticmethod
     async def get_namespace(namespace: str) -> dict:
@@ -178,10 +232,15 @@ class Config(Base):
         }
         if not Config.PERSISTENT_ENABLED:
             return default_values
+        cache_key = f'__namespace__:{namespace}'
+        cached = _cache_get(cache_key)
+        if cached is not _MISS:
+            return cached
         async with get_async_db() as db:
             result = await db.execute(select(Config).where(Config.key.like(f'{namespace}.%')))
             values = {row.key: row.value for row in result.scalars().all()}
             values.update(default_values)
+            _cache_put(cache_key, values)
             return values
 
     @staticmethod
@@ -189,11 +248,16 @@ class Config(Base):
         """Get all config as {key: value}."""
         if not Config.PERSISTENT_ENABLED:
             return dict(Config.DEFAULTS)
+        cache_key = '__all__'
+        cached = _cache_get(cache_key)
+        if cached is not _MISS:
+            return cached
         async with get_async_db() as db:
             result = await db.execute(select(Config))
             values = {row.key: row.value for row in result.scalars().all()}
             if not Config.OAUTH_PERSISTENT_ENABLED:
                 values.update({key: value for key, value in Config.DEFAULTS.items() if key.startswith('oauth.')})
+            _cache_put(cache_key, values)
             return values
 
     @staticmethod
@@ -225,6 +289,10 @@ class Config(Base):
             else:
                 db.add(Config(key=key, value=value, updated_at=now))
         await db.flush()
+        # 写穿透:读缓存就地更新(namespace/all 整段失效)
+        for key, value in persistent_updates.items():
+            _cache_put(key, value)
+        _cache_drop('__all__', *[k for k in _MEM if k.startswith('__namespace__:')])
 
     @staticmethod
     async def delete(key: str) -> bool:
@@ -234,6 +302,7 @@ class Config(Base):
             if row:
                 await db.delete(row)
                 await db.commit()
+                _cache_drop(key, '__all__', *[k for k in list(_MEM) if k.startswith('__namespace__:')])
                 return True
             return False
 
@@ -243,6 +312,7 @@ class Config(Base):
         async with get_async_db() as db:
             await db.execute(delete(Config))
             await db.commit()
+            _cache_clear()
 
     @staticmethod
     async def seed_defaults(defaults: dict) -> None:
@@ -266,6 +336,7 @@ class Config(Base):
                     value = _json_value(value)
                     db.add(Config(key=key, value=value, updated_at=now))
                     existing_keys.add(key)
+                    _cache_drop(key)
                     new_count += 1
 
             if new_count:
@@ -298,6 +369,7 @@ class Config(Base):
                 await db.delete(row)
 
             await db.commit()
+            _cache_clear()   # 键名迁移面大,整清缓存最稳
             log.info(
                 'Renamed %d config keys from %s.* to %s.*; deleted %d old duplicates',
                 moved_count,
@@ -383,6 +455,7 @@ class Config(Base):
 
             if repaired_keys or orphan_keys or default_model_keys:
                 await db.commit()
+                _cache_clear()   # 重写行形状,整清缓存
                 if repaired_keys or orphan_keys:
                     log.info('Repaired flattened dict config rows for %s', ', '.join(repaired_keys))
                 if default_model_keys:
