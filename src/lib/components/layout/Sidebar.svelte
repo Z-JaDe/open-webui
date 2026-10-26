@@ -193,12 +193,21 @@
 
 	// v3:goal 人审卡徽标——有卡待裁时 goal 任务在阻塞等你的决定,这是最该被看见的信号。
 	let banyanGoalCardsPending = 0;
+	// 503 止损:goal 面缺席的部署形态(云端无 pi-goal,引擎按设计 503 明示)下,
+	// 连续 2 次失败停跳,不再每 30s 刷网络错误;页面重载重新武装。
+	let goalCardsTimer: ReturnType<typeof setInterval> | undefined;
+	let goalCardsFailStreak = 0;
 	const refreshBanyanGoalCardsPending = async () => {
 		try {
 			const cards = await getBanyanGoalCards();
 			banyanGoalCardsPending = cards.length;
+			goalCardsFailStreak = 0;
 		} catch {
 			banyanGoalCardsPending = 0;
+			if (++goalCardsFailStreak >= 2 && goalCardsTimer) {
+				clearInterval(goalCardsTimer);
+				goalCardsTimer = undefined;
+			}
 		}
 	};
 	onMount(() => {
@@ -206,7 +215,7 @@
 		refreshBanyanInboxPending();
 		// goal 人卡无事件流,30s 轻量轮询徽标(goal 卡出现=任务在阻塞等人)
 		refreshBanyanGoalCardsPending();
-		const goalCardsTimer = setInterval(refreshBanyanGoalCardsPending, 30000);
+		goalCardsTimer = setInterval(refreshBanyanGoalCardsPending, 30000);
 		// 徽标轻量(单 GET),不设 focus 门;1s 窗口吸收事件连发
 		const refresher = createBanyanRefresher(refreshBanyanInboxPending, {
 			minIntervalMs: 1000,
@@ -225,7 +234,7 @@
 		return () => {
 			unsubscribe();
 			refresher.dispose();
-			clearInterval(goalCardsTimer);
+			if (goalCardsTimer) clearInterval(goalCardsTimer);
 		};
 	});
 
