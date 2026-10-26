@@ -966,6 +966,172 @@ export const getBanyanWorkspace = async (
 	return (await res.json()).workspace;
 };
 
+////////////////////////////
+// 设备互感知 /nodes(C3,goal-cloud 协议锁定)
+// 引擎侧并行实现(RF-C3a);经 /banyan/api 通配桥 1:1 直达(routers/banyan.py:184,
+// nodes 路径过 safe_bridge_path 守卫,后端零改动)。
+// 管理面走 webui 用户 JWT(桥剥 Authorization 注 BANYAN_TOKEN 或透传);
+// 节点自身心跳走 Caddy /engine/* 直连引擎,不经本层。
+////////////////////////////
+export type BanyanNodeInfo = {
+	node_id: string;
+	name: string;
+	/** epoch ms(引擎给 epoch 秒,本层换算;容错毫秒) */
+	last_heartbeat?: number;
+	online: boolean;
+	/** 最近一次心跳的状态载荷——引擎侧自由形状(宽松 Record),前端只做防御渲染 */
+	status?: Record<string, unknown>;
+	engine_version?: string;
+	/** epoch ms */
+	created_at?: number;
+};
+
+/** 指令 kind 封闭集(C3 协议锁定;加 kind 不加信道) */
+export type BanyanNodeCommandKind = 'chat_turn' | 'goal_card_resolve' | 'goal_abort';
+
+export type BanyanNodeCommandResult = {
+	command_id: string;
+};
+
+/** 注册回执:node_token 只此一次返回(引擎库存 hash)——调用方只渲染不落存 */
+export type BanyanNodeRegisterResult = {
+	node_id: string;
+	node_token: string;
+};
+
+/** 引擎列表载荷 → BanyanNodeInfo(裸数组为主,{nodes:[…]} 兜底;字段全防御) */
+export const listBanyanNodes = async (
+	token: string = localStorage.token
+): Promise<BanyanNodeInfo[]> => {
+	const res = await fetch(`${BANYAN_API_BASE_URL}/nodes`, {
+		method: 'GET',
+		headers: { Authorization: `Bearer ${token}` }
+	});
+	if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+	const raw: any = await res.json();
+	const rows = asArray(Array.isArray(raw) ? raw : raw?.nodes);
+	return rows.map(
+		(n: any): BanyanNodeInfo => ({
+			node_id: String(n?.node_id ?? n?.id ?? ''),
+			name: String(n?.name ?? n?.node_id ?? ''),
+			last_heartbeat: toMs(n?.last_heartbeat ?? n?.last_seen),
+			online: !!n?.online,
+			status:
+				n?.status && typeof n.status === 'object' && !Array.isArray(n.status)
+					? (n.status as Record<string, unknown>)
+					: undefined,
+			engine_version: n?.engine_version ? String(n.engine_version) : undefined,
+			created_at: toMs(n?.created_at)
+		})
+	);
+};
+
+/** POST /api/nodes {name} → {node_id, node_token}——token 只此一次,页面显示后即焚 */
+export const registerBanyanNode = async (
+	name: string,
+	token: string = localStorage.token
+): Promise<BanyanNodeRegisterResult> => {
+	const raw = await request('POST', `/nodes`, { name });
+	const out: BanyanNodeRegisterResult = {
+		node_id: String(raw?.node_id ?? ''),
+		node_token: String(raw?.node_token ?? '')
+	};
+	if (!out.node_id || !out.node_token) {
+		throw new Error(`引擎注册回执缺 node_id/node_token:${JSON.stringify(raw)?.slice(0, 80)}`);
+	}
+	return out;
+};
+
+/** POST /api/nodes/{id}/commands {kind,payload} → {command_id}(入队;回执经节点心跳异步) */
+export const sendBanyanNodeCommand = async (
+	nodeId: string,
+	kind: BanyanNodeCommandKind,
+	payload: Record<string, unknown>,
+	token: string = localStorage.token
+): Promise<BanyanNodeCommandResult> => {
+	const raw = await request('POST', `/nodes/${encodeURIComponent(nodeId)}/commands`, {
+		kind,
+		payload
+	});
+	return { command_id: String(raw?.command_id ?? raw?.id ?? '') };
+};
+
+/** DELETE /api/nodes/{id}(吊销该节点:node_tokens 删行,心跳即拒) */
+export const deleteBanyanNode = async (nodeId: string, token: string = localStorage.token) => {
+	return request('DELETE', `/nodes/${encodeURIComponent(nodeId)}`);
+};
+
+// ── C3b 设备页纯函数(时间格式化/在线判定/status 防御摘要;vitest 直测,
+// redGrouping.test.ts 同款)──
+
+/** 离线判定阈值(协议锁定 180s,引擎侧正本;前端仅兜底口径一致) */
+export const NODE_OFFLINE_AFTER_MS = 180_000;
+
+/** 心跳相对时间(epoch ms → 「刚刚/N 秒/N 分钟/N 小时/N 天前」;未来/坏值防御) */
+export const formatNodeHeartbeatAge = (
+	ms: number | undefined,
+	now: number = Date.now()
+): string => {
+	if (typeof ms !== 'number' || !(ms > 0)) return '—';
+	const diff = now - ms;
+	if (diff < 10_000) return '刚刚'; // 未来时间戳(客户端钟慢)同归「刚刚」,不渲染负数
+	if (diff < 60_000) return `${Math.floor(diff / 1000)} 秒前`;
+	if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} 分钟前`;
+	if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时前`;
+	return `${Math.floor(diff / 86_400_000)} 天前`;
+};
+
+/**
+ * 在线判定:引擎 `online` 布尔是正本(180s 阈值在引擎侧算,不信客户端时钟推 sent_at);
+ * 引擎未给布尔(形状漂移/旧引擎)时前端按 last_heartbeat 距今 <180s 兜底,口径一致。
+ */
+export const isNodeOnline = (
+	online: unknown,
+	lastHeartbeatMs: number | undefined,
+	now: number = Date.now(),
+	thresholdMs: number = NODE_OFFLINE_AFTER_MS
+): boolean => {
+	if (typeof online === 'boolean') return online;
+	if (typeof lastHeartbeatMs !== 'number' || !(lastHeartbeatMs > 0)) return false;
+	return now - lastHeartbeatMs < thresholdMs;
+};
+
+/** 宽松 status 载荷 → 页面摘要四键(版本/uptime/last_seq/goals 数)。
+ * 引擎侧自由形状(RF-C3a 并行),已知键位逐个探测,坏值跳过不炸——
+ * 空手而归时页面渲染「—」,不做第二套状态词汇。 */
+export const nodeStatusSummary = (
+	status: unknown
+): { version?: string; uptime?: string; last_seq?: number; goals?: number } => {
+	const out: { version?: string; uptime?: string; last_seq?: number; goals?: number } = {};
+	if (!status || typeof status !== 'object' || Array.isArray(status)) return out;
+	const s = status as Record<string, unknown>;
+	const engine = (s.engine && typeof s.engine === 'object' ? s.engine : {}) as Record<
+		string,
+		unknown
+	>;
+	const counts = (s.counts && typeof s.counts === 'object' ? s.counts : {}) as Record<
+		string,
+		unknown
+	>;
+	const ver = s.version ?? s.engine_version ?? engine.version;
+	if (ver !== undefined && ver !== null && String(ver) !== '') out.version = String(ver);
+	const up = s.uptime ?? s.uptime_s ?? engine.uptime;
+	if (up !== undefined && up !== null && String(up) !== '') out.uptime = String(up);
+	for (const v of [s.last_seq, engine.last_seq]) {
+		if (typeof v === 'number' && Number.isFinite(v)) {
+			out.last_seq = v;
+			break;
+		}
+	}
+	for (const v of [s.goals, s.running_goals, counts.goals, counts.running_goals]) {
+		if (typeof v === 'number' && Number.isFinite(v)) {
+			out.goals = v;
+			break;
+		}
+	}
+	return out;
+};
+
 export const getBanyanStatus = async (token: string = localStorage.token): Promise<BanyanEngineStatus> => {
 	const res = await fetch(`${BANYAN_API_BASE_URL}/status`, {
 		method: 'GET',

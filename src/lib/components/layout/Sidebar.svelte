@@ -168,10 +168,12 @@
 
 	// v3 精简(2026-10-25):goal 内核为正主,侧边栏只留活跃面(目标/信箱/日历/架构)。
 	// v2 波次面(登记簿/审卡/审计/方案/会话树)已随 5aafbc6 连根删除(无 URL 直达)。
+	// C3(2026-10-26)追加 /devices 设备互感知页(登录即可见,与 workspaces 同口径)。
 	const banyanTaskEntries = [
 		{ id: 'goals', label: 'Goal 会话', href: '/goals', prefix: '/goals' },
 		{ id: 'inbox', label: '信箱', href: '/inbox', prefix: '/inbox' },
 		{ id: 'cal', label: '日历', href: '/cal', prefix: '/cal' },
+		{ id: 'devices', label: '设备', href: '/devices', prefix: '/devices', icon: '📱' },
 		{ id: 'arch', label: '架构', href: '/arch', prefix: '/arch' }
 	];
 
@@ -1471,7 +1473,7 @@
 								aria-label={$i18n.t(entry.label)}
 							>
 								<div class="self-center flex size-4 shrink-0 items-center justify-center text-gray-700 dark:text-gray-300">
-									<div class="text-[10px] font-semibold leading-none">B</div>
+									<div class="text-[10px] font-semibold leading-none">{entry.icon ?? 'B'}</div>
 								</div>
 								<div class="flex self-center translate-y-[0.5px] min-w-0">
 									<div class="self-center text-[0.8125rem] leading-5 truncate">
