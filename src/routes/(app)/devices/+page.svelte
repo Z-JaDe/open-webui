@@ -287,11 +287,12 @@
 					</div>
 					<pre
 						class="text-[11px] leading-5 font-mono bg-white dark:bg-gray-900 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2.5 break-all whitespace-pre-wrap select-all"
-						data-testid="banyan-node-cloud-env-guide">BANYAN_CLOUD_URL=https://banyan.pyrris.com/engine
+						data-testid="banyan-node-cloud-env-guide">BANYAN_CLOUD_URL=https://login.pyrris.com
 BANYAN_NODE_ID={newToken.node_id}
 BANYAN_NODE_TOKEN={newToken.node_token}</pre>
 					<div class="text-[11px] text-gray-400 dark:text-gray-500">
-						URL 必须带 <code class="font-mono">/engine</code> 路径(节点直连引擎的 Caddy 入口);
+						引擎公网入口(域根直连,Caddy 反代引擎;/engine 前缀形态已随域名统一退役——
+						带前缀会被 301 且 POST 不跟随,节点永不上线,DA-2 A1 实测);
 						保存后无需重启(下一拍自动热载)。
 					</div>
 					<div class="flex items-center gap-2">

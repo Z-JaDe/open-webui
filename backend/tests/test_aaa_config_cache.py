@@ -161,3 +161,15 @@ def test_namespace_and_all_cached_and_invalidated(env):
     a = env.execute_calls
     run(Config.get_all())
     assert env.execute_calls == a, 'get_all 命中缓存'
+
+
+def test_get_many_merges_disabled_keys(env):
+    """红测(DA-2 A2 回归收口):混合 enabled+disabled 键时,disabled 键
+    (非持久化,DEFAULTS 供值)必须并入输出——上游原语义,缓存层重构曾丢。"""
+    Config.configure(
+        defaults={'demo.a': 'def-a', 'oauth.x': 'def-ox'},
+        enable_persistent=True, enable_oauth_persistent=False)
+    out = run(Config.get_many('demo.x', 'oauth.x'))
+    assert out.get('demo.x') == 'v1', "enabled 键走库"
+    assert out.get('oauth.x') == 'def-ox', \
+        f"disabled 键并入输出(修前丢失):{out}"

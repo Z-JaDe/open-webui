@@ -220,6 +220,8 @@ class Config(Base):
                 _cache_put(key, value)
                 if key in values or key in Config.DEFAULTS:
                     out[key] = value
+        # disabled 键并入输出(上游原语义;缓存层重构曾丢,DA-2 A2 复现回归)
+        out.update(disabled_values)
         return out
 
     @staticmethod
