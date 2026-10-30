@@ -11,6 +11,12 @@
 		type CalendarModel,
 		type CalendarEventModel
 	} from '$lib/apis/calendar';
+	import {
+		getBanyanSystemTasks,
+		systemTaskIcon,
+		systemTaskLabel,
+		type BanyanSystemTask
+	} from '$lib/apis/banyan';
 	import CalendarView from '$lib/components/calendar/CalendarView.svelte';
 	import CalendarSidebar from '$lib/components/calendar/CalendarSidebar.svelte';
 	import CalendarEventModal from '$lib/components/calendar/CalendarEventModal.svelte';
@@ -36,6 +42,32 @@
 	let editEvent: CalendarEventModel | null = null;
 	let defaultStartAt: number | null = null;
 	let showCreateCalendarModal = false;
+
+	// V4W-2 系统任务(引擎递归审查/知识自沉淀/自动化 K1 事件):加载一次,
+	// 不随日历视图切换重拉(近 7 天静态历史;W5 interval 纪律——零新增轮询)
+	let systemTasks: BanyanSystemTask[] = [];
+	let systemTasksError = '';
+	const SYSTEM_TASK_WINDOW_MS = 7 * 24 * 3600 * 1000;
+
+	async function loadSystemTasks() {
+		try {
+			const rows = await getBanyanSystemTasks({ limit: 50 });
+			const since = Date.now() - SYSTEM_TASK_WINDOW_MS;
+			systemTasks = rows.filter((t) => t.ts >= since);
+			systemTasksError = '';
+		} catch (err) {
+			systemTasks = [];
+			systemTasksError = err instanceof Error ? err.message : String(err);
+		}
+	}
+
+	const systemTaskTime = (ts: number) => {
+		const diff = Date.now() - ts;
+		if (diff < 60_000) return '刚刚';
+		if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} 分钟前`;
+		if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时前`;
+		return `${Math.floor(diff / 86_400_000)} 天前`;
+	};
 
 	const MONTH_NAMES = [
 		'January',
@@ -204,6 +236,7 @@
 	onMount(async () => {
 		await loadCalendars();
 		await refresh();
+		void loadSystemTasks(); // 引擎侧低频历史,失败不阻日历本体
 		loaded = true;
 	});
 </script>
@@ -358,6 +391,42 @@
 					onDeleteCalendar={handleDeleteCalendar}
 					onDateSelect={handleDateSelect}
 				/>
+
+				<!-- V4W-2 系统任务:引擎自转事件近 7 天(审查🔍/知识📚/自动化⚙),点击去 goals 页 -->
+				<div
+					class="mt-4 rounded-xl border border-gray-100 dark:border-gray-850 p-3"
+					data-testid="banyan-system-tasks"
+				>
+					<div class="flex items-center justify-between mb-2">
+						<div class="text-xs font-medium text-gray-900 dark:text-white">系统任务</div>
+						<div class="text-[10px] text-gray-400 dark:text-gray-500">近 7 天 · {systemTasks.length}</div>
+					</div>
+					{#if systemTasksError}
+						<div class="text-[10px] text-gray-400 dark:text-gray-500">
+							引擎不可达(系统任务来自本地引擎 K1 事件)
+						</div>
+					{:else if systemTasks.length === 0}
+						<div class="text-[10px] text-gray-400 dark:text-gray-500">暂无系统任务(审查/知识/自动化)</div>
+					{:else}
+						<div class="space-y-1">
+							{#each systemTasks as task (task.kind + String(task.ts))}
+								<button
+									class="w-full text-left rounded-lg px-2 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-900 transition"
+									title={task.payload}
+									on:click={() => goto('/goals')}
+								>
+									<div class="flex items-center justify-between gap-1">
+										<span class="text-[11px] text-gray-700 dark:text-gray-300 truncate">
+											{systemTaskIcon(task.kind)} {systemTaskLabel(task.kind)}
+										</span>
+										<span class="text-[10px] text-gray-400 whitespace-nowrap">{systemTaskTime(task.ts)}</span>
+									</div>
+									<div class="text-[10px] text-gray-400 dark:text-gray-500 truncate font-mono">{task.kind}</div>
+								</button>
+							{/each}
+						</div>
+					{/if}
+				</div>
 			</div>
 
 			<!-- Calendar -->

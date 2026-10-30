@@ -800,6 +800,14 @@ export type BanyanEngineStatus = {
 		output?: string;
 	}[];
 	counts: { inbox: BanyanInboxUnread; plans_running: number };
+	// V4W-1 云端第二上游概要(代理层聚合附加;env 缺=无键=undefined 不渲染)。
+	// 只读聚合:云端引擎状态摘要,不代表本引擎。
+	cloud?: {
+		ok: boolean;
+		host?: string;
+		engine?: { status?: string; last_seq?: number; version?: string };
+		error?: string;
+	};
 };
 
 export const getBanyanAgent = async (
@@ -825,12 +833,17 @@ export type BanyanGoalEntry = {
 	settledAt: number | null;
 	summary: string | null;
 	error: string | null;
+	/** V4W-1 云来源标记:代理层聚合的云端条目=true(杭州引擎,只读);
+	 * 本地条目无键(undefined)。云端 goal 的写操作(abort/卡裁决)走本地,不可达。 */
+	cloud?: boolean;
 };
 
 export type BanyanGoalConvs = {
 	manager: { name: string; conversationId: string; transcript: Array<{ role: string; text: string }> };
 	subagents: Array<{ name: string; conversationId: string; transcript: Array<{ role: string; text: string }> }>;
 	reviewers: Array<{ name: string; conversationId: string; transcript: Array<{ role: string; text: string }> }>;
+	/** V4W-1 云回退标记:本地 miss、云端命中时代理层附加=true(转录页云徽标) */
+	cloud?: boolean;
 };
 
 export const getBanyanGoals = async (
@@ -863,6 +876,8 @@ export type BanyanGoalCard = {
 	question: string;
 	status: 'open' | 'approved' | 'rejected';
 	createdAt: number;
+	/** V4W-1 云来源卡(代理层聚合):只读展示,裁决按钮禁用(写操作走本地) */
+	cloud?: boolean;
 };
 
 export const getBanyanGoalCards = async (
@@ -1271,6 +1286,81 @@ export const getBanyanStatus = async (token: string = localStorage.token): Promi
 				notice: Number(unread?.notice ?? 0)
 			},
 			plans_running: Number(raw?.counts?.plans_running ?? 0)
-		}
+		},
+		// V4W-1 云概要(代理层聚合附加;env 缺/未聚合=无键 → undefined)
+		cloud:
+			raw?.cloud && typeof raw.cloud === 'object'
+				? {
+						ok: !!raw.cloud.ok,
+						host: raw.cloud.host ? String(raw.cloud.host) : undefined,
+						engine:
+							raw.cloud.engine && typeof raw.cloud.engine === 'object'
+								? {
+										status: raw.cloud.engine.status
+											? String(raw.cloud.engine.status)
+											: undefined,
+										last_seq:
+											typeof raw.cloud.engine.last_seq === 'number'
+												? raw.cloud.engine.last_seq
+												: undefined,
+										version: raw.cloud.engine.version
+											? String(raw.cloud.engine.version)
+											: undefined
+									}
+								: undefined,
+						error: raw.cloud.error ? String(raw.cloud.error) : undefined
+					}
+				: undefined
 	};
+};
+
+////////////////////////////
+// 系统任务 /system-tasks(V4W-2,引擎 K1 轻读面:递归审查/知识自沉淀/自动化)
+// 引擎 GET /api/system-tasks?limit= → {tasks:[{kind,ts,payload(摘要≤200 字)}]}
+// 新→旧;cal 页「系统任务」侧栏消费(近 7 天,kind 前缀图标)。
+////////////////////////////
+export type BanyanSystemTask = {
+	/** K1 kind:automation. / review. / knowledge. 前缀 */
+	kind: string;
+	/** epoch ms(引擎给 epoch 秒,本层换算;容错毫秒) */
+	ts: number;
+	/** payload 摘要(引擎侧 JSON 串截断 ≤200 字,只供人扫) */
+	payload: string;
+};
+
+export const getBanyanSystemTasks = async (
+	query: { limit?: number } = {},
+	token: string = localStorage.token
+): Promise<BanyanSystemTask[]> => {
+	const params = new URLSearchParams();
+	params.set('limit', String(query.limit ?? 50));
+	const res = await fetch(`${BANYAN_API_BASE_URL}/system-tasks?${params.toString()}`, {
+		method: 'GET',
+		headers: { Authorization: `Bearer ${token}` }
+	});
+	if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+	const raw: any = await res.json();
+	return asArray(raw?.tasks).map(
+		(t: any): BanyanSystemTask => ({
+			kind: String(t?.kind ?? ''),
+			ts: toMs(t?.ts) ?? Date.now(),
+			payload: typeof t?.payload === 'string' ? t.payload : ''
+		})
+	);
+};
+
+/** kind 前缀 → 侧栏图标(审查🔍/知识📚/自动化⚙;未知前缀中性点) */
+export const systemTaskIcon = (kind: string): string => {
+	if (kind.startsWith('review.')) return '🔍';
+	if (kind.startsWith('knowledge.')) return '📚';
+	if (kind.startsWith('automation.')) return '⚙';
+	return '·';
+};
+
+/** kind 前缀 → 类别词(展示用;未知 kind 原样) */
+export const systemTaskLabel = (kind: string): string => {
+	if (kind.startsWith('review.')) return '审查';
+	if (kind.startsWith('knowledge.')) return '知识';
+	if (kind.startsWith('automation.')) return '自动化';
+	return kind;
 };

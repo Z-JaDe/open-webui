@@ -89,6 +89,11 @@
 		convsLoading = false;
 	}
 
+	// V4W-1:云来源 goal(代理层聚合,杭州引擎)——列表/转录页 ☁ 徽标;
+	// 云 goal 只读(写操作走本地引擎,云端数据不可写)
+	const isCloudGoal = (goalId: string) =>
+		goals.find((g) => g.goalId === goalId)?.cloud === true || convs?.cloud === true;
+
 	$: tabs = convs
 		? [
 				{ id: 'manager', label: '管理者', icon: '🧠', count: convs.manager.transcript.length },
@@ -175,7 +180,7 @@
 								class="text-left text-xs text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
 								on:click={() => select(card.goalId)}
 							>
-								来自 goal: <span class="font-mono">{goalObjective(card.goalId).slice(0, 60)}</span>
+								来自 goal: <span class="font-mono">{#if card.cloud}☁ {/if}{goalObjective(card.goalId).slice(0, 60)}</span>
 								{#if goals.find((g) => g.goalId === card.goalId)}
 									<span class="underline">· 查看会话</span>
 								{/if}
@@ -184,20 +189,22 @@
 							<div class="flex items-center gap-2">
 								<button
 									class="px-3 py-1.5 text-xs font-medium rounded-lg bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black disabled:opacity-50 transition"
-									disabled={resolvingCard === card.cardId}
+									disabled={resolvingCard === card.cardId || card.cloud === true}
+									title={card.cloud === true ? '云端 goal 的卡只读(写操作走本地引擎)' : ''}
 									on:click={() => decide(card, 'approved')}
 								>
 									批准
 								</button>
 								<button
 									class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 transition"
-									disabled={resolvingCard === card.cardId}
+									disabled={resolvingCard === card.cardId || card.cloud === true}
+									title={card.cloud === true ? '云端 goal 的卡只读(写操作走本地引擎)' : ''}
 									on:click={() => decide(card, 'rejected')}
 								>
 									驳回
 								</button>
 								<span class="text-[10px] text-gray-400">
-									{card.createdAt ? new Date(card.createdAt).toLocaleString() : ''}
+									{#if card.cloud}☁ 云端(只读) · {/if}{card.createdAt ? new Date(card.createdAt).toLocaleString() : ''}
 								</span>
 							</div>
 						</div>
@@ -217,7 +224,7 @@
 								on:click={() => select(g.goalId)}
 							>
 								<div class="flex items-center justify-between gap-2">
-									<span class="truncate">{g.objective.slice(0, 40)}</span>
+									<span class="truncate">{#if g.cloud}<span title="云端 goal(杭州引擎,只读)">☁</span> {/if}{g.objective.slice(0, 40)}</span>
 									<span class="text-[10px] whitespace-nowrap font-mono {statusColor(g.status)}">{phaseLabel(g)}</span>
 								</div>
 								<div class="text-[10px] text-gray-400 dark:text-gray-500 truncate">{g.goalId} · {g.kind}</div>
@@ -233,6 +240,12 @@
 						{:else if convsError}
 							<div class="text-sm text-red-500 dark:text-red-400 py-6 text-center">{convsError}</div>
 						{:else if convs}
+							{#if isCloudGoal(selected)}
+								<!-- V4W-1:云端 goal(本地 miss、云回退命中)——只读展示,写操作走本地不可达 -->
+								<div class="mb-3 rounded-lg border border-sky-200 dark:border-sky-900/50 bg-sky-50 dark:bg-sky-950/20 px-3 py-2 text-xs text-sky-700 dark:text-sky-400">
+									☁ 云端 goal(杭州引擎,只读聚合)——转录为云端 pi-goal 正本;写操作(中止/裁决)不在本地引擎,不可达
+								</div>
+							{/if}
 							<div class="flex flex-wrap gap-1.5 mb-3">
 								{#each tabs as t}
 									<button
