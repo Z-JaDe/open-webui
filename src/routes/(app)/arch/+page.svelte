@@ -110,13 +110,16 @@
 						四个进程:引擎(:8000,触发器·K1 事实正本·store 工具回调)· pi-sidecar(:8100,pi 执行内核·沙箱工具)· <b>pi-goal(:8101,goal 内核·durable 执行正本,v3 新)</b>· WebUI(:8080,身份认证·界面呈现)。
 					</p>
 					<p class="text-gray-500 dark:text-gray-400">
+						<b>v4(判据全上移)</b>:角色层退役——系统只提供参数化执行单元(调度参数 task / tier / effort / tools),人设与调度习惯全部住进主 Agent 提示词;新增递归审查循环(见下)与知识自沉淀(goal 终态 → 知识 goal → 空间私有 knowledge/)。不退的三件:subagent 独立上下文 / goal 机械验收 / jail+凭证+K1 审计。
+					</p>
+					<p class="text-gray-500 dark:text-gray-400">
 						存储根(BANYAN_HOME):
 						<span class="break-all font-mono text-xs text-gray-700 dark:text-gray-300">
 							{home || '引擎不可达'}
 						</span>
 					</p>
 					<p class="text-gray-400 dark:text-gray-500 text-xs">
-						人只出现在两个触点:批准方案、处置信箱。其余全自动。
+						人只出现在少数触点:批准方案、处置信箱、goal 人审卡(v4 递归审查不收敛升级亦落人卡)。其余全自动。
 					</p>
 				</div>
 
@@ -140,7 +143,8 @@
 					Agent 全景({agents.length} 预设)
 				</div>
 				<p class="text-gray-400 dark:text-gray-500 text-xs mb-3">
-					每个 Agent 一份 md(frontmatter:名称/描述/档位/工具/记忆/输出),提示词正本在
+					v4:agents_baseline 由 4+1 角色收敛为执行底座(任务主 Agent 的 instructions 缺省)——subagent 调度不再按角色,按参数
+					<code class="text-[10px]">task / tier / effort / tools</code>(工具面默认全量,可选覆盖;readOnly 等是能力不是角色)。每份 md(frontmatter:名称/描述/档位/工具/记忆/输出)提示词正本在
 					<code class="text-[10px]">{home}/agents/</code>。全部跑在 pi 内核 ReAct 上。
 				</p>
 				{#if loaded && agents.length}
@@ -189,32 +193,79 @@
 				{/if}
 			</div>
 
-			<!-- ═══ 角色交互(五场景 choreography)═══ -->
+			<!-- ═══ 递归审查循环(设计 v4 §3)═══ -->
+			<div
+				class="rounded-xl border border-gray-100 dark:border-gray-850 p-4 text-xs mb-6"
+				data-testid="banyan-arch-review-loop"
+			>
+				<div class="text-sm font-medium text-black dark:text-white mb-3">
+					递归审查循环(设计 v4)——双触发 → 交叉审查 → 指纹/不收敛治理 → 人卡
+				</div>
+				<div class="font-mono text-[11px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 rounded p-2 overflow-x-auto mb-3">
+cron 每日 ─┐                     ┌─ subagent×N 交叉审查(独立上下文,多切面)
+git watch ─┼→ goal_start(审查)──┤        ↓
+(变更≥N)─┘   对象=主分支全量diff  └─ 汇最佳方案 → goal_start(修复) → 下轮连带
+                                        ↓
+                          指纹库:fingerprint=hash(文件+区域+问题类)
+                          同指纹再现→轮次+1;连续 3 轮未收敛→停自修+人卡
+				</div>
+				<ul class="space-y-1 text-gray-500 dark:text-gray-400 list-disc pl-4">
+					<li>触发:①automation cron(每日)②git watch(引擎 loop 定期 fetch,last_reviewed_sha..origin/main 变更数≥阈值)——零 LLM 触发</li>
+					<li>指纹:审查发现落 K1(review.finding 带 fingerprint);轮次=跨 run 聚合;anchor 用符号名/逻辑区块名(行号随修复漂移会断链)</li>
+					<li>不收敛治理:同指纹连续 3 轮 → 禁止自修,升级人卡附完整轮次史(铁律 6 同构:禁止第三次打补丁)</li>
+					<li>审查 goal 验收内置交叉收敛纪律(交叉印证/指控分离/回退验证);review_report 是唯一汇报正门</li>
+				</ul>
+			</div>
+
+			<!-- ═══ 知识自沉淀(设计 v4 §2)═══ -->
+			<div
+				class="rounded-xl border border-gray-100 dark:border-gray-850 p-4 text-xs mb-6"
+				data-testid="banyan-arch-knowledge-settle"
+			>
+				<div class="text-sm font-medium text-black dark:text-white mb-3">
+					知识自沉淀(设计 v4)——goal 终态 → 知识 goal → 空间私有域
+				</div>
+				<div class="font-mono text-[11px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 rounded p-2 overflow-x-auto mb-3">
+goal 终态(completed|failed|aborted)─┐
+cron ─────────────────────────────┴→ 起 kind=knowledge 的知识 goal
+        (知识官底座 instructions)→ 提炼/去重(grep 同主题先更新)/更新/归档
+        → 写空间私有 knowledge/(条目三段式;K3 cards/ 为机制挂载点)
+        → K1:knowledge.goal_started / knowledge.settled(dedup 正本)
+				</div>
+				<ul class="space-y-1 text-gray-500 dark:text-gray-400 list-disc pl-4">
+					<li>自递归防护三重:知识 goal 终态不再触发 / objective 前缀标记 / kind=knowledge 跳过</li>
+					<li>同 goal 只沉淀一次:dedup 正本=K1 knowledge.settled(kv 只是加速缓存,启动从 K1 重建)</li>
+					<li>v4 目录清理:knowledge/agents、knowledge/workflow 已删(空目录零消费);正本=空间私有 knowledge/</li>
+				</ul>
+			</div>
+
+			<!-- ═══ Agent 交互(v4 参数化;旧「角色交互」表述已废)═══ -->
 			<div
 				class="rounded-xl border border-gray-100 dark:border-gray-850 p-4 text-xs mb-6"
 				data-testid="banyan-arch-interactions"
 			>
 				<div class="text-sm font-medium text-black dark:text-white mb-3">
-					角色交互(Agent 之间永不直接对话,一切经三种黑板:K1 事件流 · 工作区文件 · 人卡/信箱)
+					Agent 交互(Agent 之间永不直接对话,一切经三种黑板:K1 事件流 · 工作区文件 · 人卡/信箱)
 				</div>
 				<div class="space-y-4">
 					<div>
-						<div class="font-medium text-gray-700 dark:text-gray-300 mb-1">对话流(秘书主导)</div>
+						<div class="font-medium text-gray-700 dark:text-gray-300 mb-1">对话流(主 Agent 主导)</div>
 						<div class="font-mono text-[11px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 rounded p-2 overflow-x-auto">
-人 ─▶ WebUI ─▶ /conv submit(秘书.md durable 会话+回调工具∪subagent)
+人 ─▶ WebUI ─▶ /conv submit(主 Agent durable 会话+回调工具∪subagent)
   ├─ 工具调用 ─▶ HTTP 回调 ─▶ 引擎 store 直读(信箱/任务/台账/日历)
-  ├─ subagent(role=探索者/审查者) ─▶ 常驻子代理 ─▶ 答案自动回流
+  ├─ subagent(参数化:task/tier/effort/tools,v4 起 role 退役) ─▶ 常驻子代理 ─▶ 答案自动回流
   └─ 回复 ──▶ pi_event 镜像 ─▶ SSE ─▶ WebUI 流式 ──▶ chat.db(K1 先行)
 						</div>
 					</div>
 <div>
 						<div class="font-medium text-gray-700 dark:text-gray-300 mb-1">机制流(goal 内核主导——一切机制的统一形态)</div>
-						<div class="font-mono text-[11px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 rounded p-2 overflow-x-auto">触发(cron/git watch/K1 订阅/手动)──▶ goal(requestId 幂等)
+							<div class="font-mono text-[11px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 rounded p-2 overflow-x-auto">触发(cron/git watch/K1 订阅/手动)──▶ goal(requestId 幂等)
   ①seed(管理者会话=引擎 md 逐字)──▶ ②plan ──▶ ③execute(轮次+预算+红测前置;
-  管理者自行 spawn 常驻子代理,答案 durable 回流;goal_report 收口)
+  管理者自行 spawn 参数化子代理,答案 durable 回流;goal_report 收口)
   ──▶ ④card(人卡:等待即挂起,approve 续跑/reject 终止)──▶ ⑤verify(绿测+交付物,
-  机器+审查者+变异门三裁判)──▶ ⑥settle(终态落 GoalIndex;完成卡/K2 结算=P2 待接线)
-崩溃任意点 ──▶ durable 提交线续跑;预算尽/证据不过 ──▶ failed+卡,绝不静默</div>
+  机器验收:AC/证据/预算/人卡,v4 判据全上移)──▶ ⑥settle(终态落 GoalIndex)
+崩溃任意点 ──▶ durable 提交线续跑;预算尽/证据不过 ──▶ failed+卡,绝不静默
+settle ──▶ (v4)知识自沉淀:终态事件自动起知识 goal,提炼入空间私有 knowledge/</div>
 					</div>
 				</div>
 			</div>
@@ -344,8 +395,8 @@
 								<td>随工作区</td>
 							</tr>
 							<tr class="border-t border-gray-100 dark:border-gray-850">
-								<td class="py-1 pr-3">知识/技能/角色正本</td>
-								<td>knowledge 仓(git: cards/records/agents/prompts)</td>
+								<td class="py-1 pr-3">知识正本</td>
+								<td>空间私有 knowledge/(v4 自沉淀:条目三段式;cards/ 留作 K3 挂载点;knowledge/agents、workflow 已删)</td>
 								<td>版本化</td>
 							</tr>
 							<tr class="border-t border-gray-100 dark:border-gray-850">
