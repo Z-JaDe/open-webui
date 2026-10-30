@@ -304,7 +304,6 @@ async def _cloud_aggregate(safe_path: str, request: Request,
         cloud, _ = await _cloud_fetch(
             BANYAN_CLOUD_URL, safe_path, request, cloud_headers,
             BANYAN_CLOUD_TIMEOUT)
-        cloud_rows, ok, _err = (None, False, "")
         if cloud is not None and cloud.status_code == 200:
             try:
                 data = cloud.json()
