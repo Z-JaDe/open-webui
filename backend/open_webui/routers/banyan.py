@@ -34,10 +34,11 @@ import asyncio
 import logging
 import os
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from open_webui.utils.auth import get_verified_user
 from open_webui.utils.banyan_bridge import safe_bridge_path
 
@@ -48,6 +49,19 @@ router = APIRouter()
 BANYAN_ENGINE_URL = os.environ.get("BANYAN_ENGINE_URL", "http://localhost:8000").rstrip("/")
 BANYAN_TOKEN = os.environ.get("BANYAN_TOKEN", "")
 BANYAN_TIMEOUT = float(os.environ.get("BANYAN_TIMEOUT", "300"))
+
+# ── V4W-1 云端第二上游(只读聚合)──
+# BANYAN_CLOUD_URL=云端引擎基址(如 https://login.pyrris.com,杭州引擎;
+# 引擎 API 挂子路径时把子路径写进 URL,与 BANYAN_ENGINE_URL 同构);
+# BANYAN_V1_TOKEN=云端引擎凭证(Authorization: Bearer,webui 后端直连公网)。
+# 两者缺任一 = 聚合分支零行为(单上游直达,现形态)。
+BANYAN_CLOUD_URL = os.environ.get("BANYAN_CLOUD_URL", "").rstrip("/")
+BANYAN_V1_TOKEN = os.environ.get("BANYAN_V1_TOKEN", "")
+BANYAN_CLOUD_TIMEOUT = float(os.environ.get("BANYAN_CLOUD_TIMEOUT", "10"))
+
+# goals/status/nodes 三族 GET 才聚合(写操作与其余路径一律本地);列表族
+# path → 响应列表键(goals/cards 的键是 cards)。
+_CLOUD_LIST_PATHS = {"goals": "goals", "goals/cards": "cards", "nodes": "nodes"}
 
 # 不向引擎转发的请求头（逐跳/本机头）
 FORWARD_HEADERS_BLOCKLIST = {
@@ -179,6 +193,197 @@ async def banyan_events_proxy(
 
 
 ############################
+# V4W-1 云端第二上游聚合(goals/status/nodes 三族 GET,只读)
+############################
+def _json_bytes(payload: Any) -> bytes:
+    """聚合响应序列化(ensure_ascii=False:中文 objective 原样)。"""
+    import json as _json
+    return _json.dumps(payload, ensure_ascii=False).encode("utf-8")
+
+
+def _cloud_should_aggregate(method: str, safe_path: str) -> bool:
+    """聚合判定:GET + env 齐 + path 命中三族(goals* / status / nodes)。
+    env 缺任一 = False(catch-all 单上游零行为);写操作永聚合(仍走本地)。"""
+    if method != "GET" or not BANYAN_CLOUD_URL or not BANYAN_V1_TOKEN:
+        return False
+    if safe_path == "status" or safe_path in _CLOUD_LIST_PATHS:
+        return True
+    # goals/{goal_id}、goals/{goal_id}/convs(单条族:本地 404 云端回退);
+    # goals/cards/{id}/resolve 等写路径是 POST,已被 method 门挡住。
+    return safe_path.startswith("goals/")
+
+
+def _cloud_host() -> str:
+    return urlparse(BANYAN_CLOUD_URL).hostname or BANYAN_CLOUD_URL
+
+
+def _raw_response(upstream: Any) -> Response:
+    """上游响应原样回传(聚合分支内的非 200/形状漂移兜底,与 catch-all 流式
+    语义等价:码/体/类型一致)。"""
+    return Response(
+        content=upstream.content,
+        status_code=upstream.status_code,
+        media_type=upstream.headers.get("content-type"),
+    )
+
+
+async def _cloud_fetch(base: str, safe_path: str, request: Request,
+                       headers: dict, timeout_s: float):
+    """GET 单上游(stream=False 全量读);返回 (response|None, error|None)。
+    响应体已读、连接即关;错误摘要不带完整 URL(内网路径不外泄)。"""
+    client = httpx.AsyncClient(timeout=httpx.Timeout(timeout_s))
+    try:
+        resp = await client.send(
+            client.build_request(
+                "GET", f"{base}/api/{safe_path}",
+                params=request.query_params, headers=headers,
+            ),
+            stream=False,
+        )
+        return resp, None
+    except (httpx.ConnectError, httpx.HTTPError) as exc:
+        return None, f"{type(exc).__name__}: {exc}"[:200]
+    finally:
+        await client.aclose()
+
+
+def _merge_list_rows(cloud_resp: Any, list_key: str) -> tuple[list, bool, str]:
+    """云端响应 → (云端条目[每条 dict 拷贝+cloud: true], ok, error)。
+    只读聚合:云端数据只拷贝不改写、绝不回写云端。"""
+    if cloud_resp is None:
+        return [], False, "unreachable"
+    if cloud_resp.status_code != 200:
+        return [], False, f"status {cloud_resp.status_code}"
+    try:
+        data = cloud_resp.json()
+    except ValueError:
+        return [], False, "bad json"
+    rows = data.get(list_key) if isinstance(data, dict) else data
+    if not isinstance(rows, list):
+        return [], False, "bad shape"
+    out = []
+    for it in rows:
+        if isinstance(it, dict):
+            marked = dict(it)
+            marked["cloud"] = True
+            out.append(marked)
+    return out, True, ""
+
+
+async def _cloud_aggregate(safe_path: str, request: Request,
+                           local_headers: dict):
+    """三族 GET 聚合主流程:本地为主 + 云端标记(cloud: true)合并展示。
+
+    - 列表族(goals / goals/cards / nodes):并发两路,本地条目前、云端
+      条目带 cloud: true;顶层附 cloud 状态 {ok, host, count, error?}。
+    - status 族:本地响应原样 + 顶层 cloud 概要 {ok, host, engine?}。
+    - 单条族(goals/{id}、goals/{id}/convs):本地先行,200 直回不打云端;
+      本地 404 → 云端试,命中则回云端体 + 顶层/条目 cloud: true(转录页
+      可看云 goal);云端也 miss → 本地 404 原样。
+    云端任何失败(不可达/非 200/坏 JSON)不拖垮本地:cloud.ok=false 诚实标注。
+    """
+    list_key = _CLOUD_LIST_PATHS.get(safe_path)
+    is_status = safe_path == "status"
+    host = _cloud_host()
+    cloud_headers = {
+        k: v for k, v in local_headers.items() if k.lower() != "authorization"
+    }
+    cloud_headers["Authorization"] = f"Bearer {BANYAN_V1_TOKEN}"
+
+    # 单条族:本地先行(本地命中零外呼云端)
+    if list_key is None and not is_status:
+        local, lerr = await _cloud_fetch(
+            BANYAN_ENGINE_URL, safe_path, request, local_headers, BANYAN_TIMEOUT)
+        if lerr:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"banyan engine unreachable at {BANYAN_ENGINE_URL}: {lerr}",
+            )
+        if local.status_code != 404:
+            return _raw_response(local)               # 本地为主:命中/其他码原样
+        cloud, _ = await _cloud_fetch(
+            BANYAN_CLOUD_URL, safe_path, request, cloud_headers,
+            BANYAN_CLOUD_TIMEOUT)
+        cloud_rows, ok, _err = (None, False, "")
+        if cloud is not None and cloud.status_code == 200:
+            try:
+                data = cloud.json()
+            except ValueError:
+                data = None
+            if isinstance(data, dict):
+                data = dict(data)
+                data["cloud"] = True                  # 顶层云标(转录页徽标)
+                if isinstance(data.get("goal"), dict):
+                    data["goal"] = dict(data["goal"])
+                    data["goal"]["cloud"] = True
+                return Response(
+                    content=_json_bytes(data), media_type="application/json")
+        return _raw_response(local)                   # 云端也 miss → 本地 404 原样
+
+    # 列表/status 族:并发两路
+    (local, lerr), (cloud, cerr) = await asyncio.gather(
+        _cloud_fetch(BANYAN_ENGINE_URL, safe_path, request,
+                     local_headers, BANYAN_TIMEOUT),
+        _cloud_fetch(BANYAN_CLOUD_URL, safe_path, request,
+                     cloud_headers, BANYAN_CLOUD_TIMEOUT),
+    )
+    if lerr:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"banyan engine unreachable at {BANYAN_ENGINE_URL}: {lerr}",
+        )
+    if local.status_code != 200:
+        return _raw_response(local)                   # 本地为主:非 200 原样透传
+    try:
+        local_data = local.json()
+    except ValueError:
+        return _raw_response(local)                   # 形状漂移:零聚合诚实透传
+
+    if is_status:
+        if not isinstance(local_data, dict):
+            return _raw_response(local)
+        out = dict(local_data)
+        cloud_state = {"ok": False, "host": host}
+        if cerr:
+            cloud_state["error"] = cerr
+        elif cloud is not None and cloud.status_code == 200:
+            try:
+                cd = cloud.json()
+            except ValueError:
+                cd = None
+            if isinstance(cd, dict):
+                cloud_state["ok"] = True
+                eng = cd.get("engine")
+                if isinstance(eng, dict):             # 云端 engine 概要(子集)
+                    cloud_state["engine"] = {
+                        k: eng[k] for k in ("status", "last_seq", "version")
+                        if k in eng}
+            else:
+                cloud_state["error"] = "bad shape"
+        else:
+            cloud_state["error"] = f"status {cloud.status_code if cloud else 'unreachable'}"
+        out["cloud"] = cloud_state
+        return Response(content=_json_bytes(out), media_type="application/json")
+
+    # 列表族
+    local_rows = None
+    if isinstance(local_data, dict):
+        local_rows = local_data.get(list_key)
+    elif isinstance(local_data, list):
+        local_rows = local_data                       # 裸数组兜底(nodes F-10 旧形状)
+    if not isinstance(local_rows, list):
+        return _raw_response(local)                   # 键缺位:不猜形状,原样透传
+    cloud_rows, ok, err = _merge_list_rows(cloud, list_key)
+    out = {
+        list_key: list(local_rows) + cloud_rows,      # 本地在前为主
+        "cloud": {"ok": ok, "host": host, "count": len(cloud_rows)},
+    }
+    if not ok:
+        out["cloud"]["error"] = err or cerr or "unknown"
+    return Response(content=_json_bytes(out), media_type="application/json")
+
+
+############################
 # Catch-all proxy
 ############################
 @router.api_route(
@@ -219,6 +424,11 @@ async def banyan_proxy(
     headers.pop("cookie", None)
 
     body = await request.body()
+
+    # V4W-1:goals/status/nodes 三族 GET 云聚合(env 缺=判定 False,零行为直达
+    # 下方单上游;写操作与其余路径永不聚合,仍走本地)
+    if _cloud_should_aggregate(request.method, safe_path):
+        return await _cloud_aggregate(safe_path, request, headers)
 
     # L1-11:client 建在 try 外——下方 ConnectError/HTTPError 分支 raise 前必须
     # aclose(与 /events 同款),否则引擎不可达时每请求漏一个连接池。
