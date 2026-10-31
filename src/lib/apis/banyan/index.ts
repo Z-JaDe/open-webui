@@ -1364,3 +1364,67 @@ export const systemTaskLabel = (kind: string): string => {
 	if (kind.startsWith('automation.')) return '自动化';
 	return kind;
 };
+
+////////////////////////////
+// 需求树(v4 requirements)
+////////////////////////////
+
+export interface BanyanRequirement {
+	id: string;
+	parent_id: string | null;
+	title: string;
+	detail: string;
+	status: 'open' | 'in_progress' | 'blocked' | 'done' | 'dropped';
+	blocked_by: string;
+	goal_ids: string;
+	created_at: number;
+	updated_at: number;
+}
+
+export const listBanyanRequirements = async (
+	status?: string,
+	parentId?: string
+): Promise<BanyanRequirement[]> => {
+	const params = new URLSearchParams();
+	if (status) params.set('status', status);
+	if (parentId) params.set('parent_id', parentId);
+	const qs = params.toString();
+	const raw = await request('POST', `/agent-tools/req_list${qs ? `?${qs}` : ''}`, {});
+	// 引擎返回 {requirements: [...]} 或裸数组
+	return Array.isArray(raw) ? raw : raw?.requirements ?? [];
+};
+
+export const createBanyanRequirement = async (
+	title: string,
+	detail?: string,
+	parentId?: string
+): Promise<{ id: string; title: string; status: string }> => {
+	return request('POST', '/agent-tools/req_create', {
+		title,
+		...(detail ? { detail } : {}),
+		...(parentId ? { parent_id: parentId } : {})
+	});
+};
+
+export const updateBanyanRequirement = async (
+	id: string,
+	updates: Partial<Pick<BanyanRequirement, 'status' | 'title' | 'detail' | 'blocked_by' | 'goal_ids'>>
+): Promise<{ ok: boolean }> => {
+	return request('POST', '/agent-tools/req_update', { id, ...updates });
+};
+
+export const REQ_STATUS_COLORS: Record<string, string> = {
+	open: 'text-gray-500',
+	in_progress: 'text-blue-500',
+	blocked: 'text-red-500',
+	done: 'text-green-500',
+	dropped: 'text-gray-400 line-through'
+};
+
+export const REQ_STATUS_LABELS: Record<string, string> = {
+	open: '待开始',
+	in_progress: '进行中',
+	blocked: '被阻塞',
+	done: '已完成',
+	dropped: '已放弃'
+};

@@ -170,6 +170,7 @@
 	// v2 波次面(登记簿/审卡/审计/方案/会话树)已随 5aafbc6 连根删除(无 URL 直达)。
 	// C3(2026-10-26)追加 /devices 设备互感知页(登录即可见,与 workspaces 同口径)。
 	const banyanTaskEntries = [
+		{ id: 'requirements', label: '需求树', href: '/requirements', prefix: '/requirements', icon: '🌳' },
 		{ id: 'goals', label: 'Goal 会话', href: '/goals', prefix: '/goals' },
 		{ id: 'inbox', label: '信箱', href: '/inbox', prefix: '/inbox' },
 		{ id: 'cal', label: '日历', href: '/cal', prefix: '/cal' },
